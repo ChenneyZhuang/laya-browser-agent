@@ -25,6 +25,9 @@ jobs:
             python: "3.13"          # newest supported
           - os: windows-2022        # Windows x86_64
             python: "3.11"
+          # Intel Mac. NOTE: this runner is chronologically starved on GitHub's free
+          # tier (40+ min queues observed). It is kept in the matrix because Intel
+          # x86_64 macOS is a supported platform, but expect it to be the slowest job.
           - os: macos-13            # Intel Mac (x86_64)
             python: "3.11"
           - os: macos-14            # Apple Silicon (M1)

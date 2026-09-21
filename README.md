@@ -139,7 +139,7 @@ changes by device is which runtime you install and how big a decision you can af
 |---|---|---|
 | **Apple Silicon M-series, 16 GB+** (M1–M4) | `laya-mlx` | The reference experience: 10–30 ms short decisions, ~330 ms scoped browser steps, everything local. This is what the benchmarks above measure. |
 | **Apple Silicon, 8 GB** (M1/M2 base) | `laya-mlx` | Works, but 650 MB checkpoint + Chromium is tight. The subprocess design keeps one model OR one browser resident; close heavy apps. Expect swap pressure on big pages. |
-| **Intel Mac** | `laya` (PyTorch) | `laya-mlx` does not run here. Model works; expect ~2–4× the Apple Silicon latency on CPU. Browser loop fine. |
+| **Intel Mac** | `laya` (PyTorch) | `laya-mlx` does not run here. Model works; expect ~2–4× the Apple Silicon latency on CPU. Browser loop fine. (GitHub's Intel CI runners are heavily queued — 40+ min — so Intel CI results may lag.) |
 | **Linux server, CPU only** | `laya` (PyTorch) | Good for batch deciding (no browser needed for classification). Browser loops work headless. Latency similar to Intel Mac CPU. |
 | **Linux + NVIDIA GPU** | `laya` (PyTorch, CUDA) | Best PyTorch path — GPU inference cuts latency well below CPU. Also the only place you can *fine-tune* (the laya-browser recipe needs CUDA). |
 | **Windows** | `laya` (PyTorch) | Works; same expectations as Linux CPU. Playwright supports it natively. |
