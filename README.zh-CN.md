@@ -28,13 +28,13 @@
 
 ```bash
 # Apple Silicon（MLX，最快路径）
-pip install 'localdecide[mlx]'
+pip install 'laya-browser-agent[mlx]'
 
 # Linux / Windows / Intel Mac（同样权重，PyTorch 运行时）
-pip install 'localdecide[torch]'
+pip install 'laya-browser-agent[torch]'
 
 # 浏览器驱动
-pip install 'localdecide[playwright]' && playwright install chromium
+pip install 'laya-browser-agent[playwright]' && playwright install chromium
 ```
 
 自检（自动识别芯片与内存，并做一次真实决策的冒烟测试）：

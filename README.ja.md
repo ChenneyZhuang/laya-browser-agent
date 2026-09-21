@@ -24,8 +24,8 @@
 ## インストール
 
 ```bash
-pip install 'localdecide[mlx]'      # Apple Silicon
-pip install 'localdecide[torch]'    # Linux / Windows / Intel Mac
+pip install 'laya-browser-agent[mlx]'      # Apple Silicon
+pip install 'laya-browser-agent[torch]'    # Linux / Windows / Intel Mac
 localdecide doctor                  # ハードウェア診断 + スモークテスト
 ```
 

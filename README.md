@@ -248,7 +248,7 @@ the chrome filter, whatever it looks like — because "Random article" is a navi
 ### 3. As an MCP server for Claude Desktop, Cursor, and friends
 
 ```bash
-pip install 'localdecide[mlx]'   # or [torch]
+pip install 'laya-browser-agent[mlx]'   # or [torch]
 localdecide-mcp
 ```
 
@@ -710,8 +710,8 @@ one is runnable, and each answers a specific question:
 ## Troubleshooting
 
 **`localdecide doctor` says "No local decision runtime yet"**
-Install the extras for your platform: `pip install 'localdecide[mlx]'` on Apple Silicon,
-`pip install 'localdecide[torch]'` everywhere else. Then run doctor again — it now runs a
+Install the extras for your platform: `pip install 'laya-browser-agent[mlx]'` on Apple Silicon,
+`pip install 'laya-browser-agent[torch]'` everywhere else. Then run doctor again — it now runs a
 one-decision smoke test, so "OK" means the checkpoint loaded and answered.
 
 **First decision is slow (~10 s)**
