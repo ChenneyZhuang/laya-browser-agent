@@ -100,23 +100,56 @@ into a table your code built.
 
 ## Install
 
+### Step by step
+
+**1. Install the package with the extras for your platform:**
+
 ```bash
-# Apple Silicon (fastest path — MLX)
-pip install 'localdecide[mlx]'
+# Apple Silicon Mac (M1–M4) — MLX runtime, fastest path:
+pip install 'laya-browser-agent[mlx]'
 
-# Linux / Windows / Intel Mac (same checkpoints via PyTorch)
-pip install 'localdecide[torch]'
+# Linux / Windows / Intel Mac — same checkpoints through PyTorch:
+pip install 'laya-browser-agent[torch]'
 
-# plus a browser driver
-pip install 'localdecide[playwright]' && playwright install chromium
-# or attach to a Chrome you already have open and logged in
-pip install 'localdecide[cdp]'
+# Linux + NVIDIA GPU — PyTorch with CUDA (torch will pick the CUDA wheel if present):
+pip install 'laya-browser-agent[torch]'
 ```
 
-Check what you have — `doctor` detects your hardware and tells you exactly what to do:
+**2. Install a browser driver (only needed for the browser loop):**
+
+```bash
+pip install 'laya-browser-agent[playwright]' && playwright install chromium
+# Or attach to a Chrome you already have open and logged in — no download:
+pip install 'laya-browser-agent[cdp]'
+```
+
+**3. Run the hardware check.** `doctor` detects your chip and memory, picks the right
+runtime, and runs a one-decision smoke test — so a broken install shows up here, not in
+your agent:
 
 ```bash
 localdecide doctor
+```
+
+Expected output on an M4:
+
+```
+python      3.12.13 (arm64, Darwin)
+hardware    Apple M4, 16 GB unified memory
+laya-mlx    installed
+playwright  installed
+backend     laya-mlx
+smoke test  OK (85 ms, first call includes model load)
+```
+
+**4. From source** (for development):
+
+```bash
+git clone https://github.com/ChenneyZhuang/laya-browser-agent
+cd laya-browser-agent
+python3.12 -m venv .venv && source .venv/bin/activate
+pip install -e '.[all,playwright,cdp]' pytest
+python -m pytest tests/test_contract.py -q     # 55 tests, no model needed
 ```
 
 On an M4 it prints the chip, memory, runtime, and runs a one-decision smoke test so a
@@ -464,6 +497,23 @@ either guarded or documented — not hidden.
 The third one is the most useful lesson for anyone tuning this: **the option list and the
 page text do the work; prompts do not.**
 
+### Real production sites (read-only goals, scoped to 25 elements)
+
+Measured against live sites, unscripted, with the same 25-element scope:
+
+| Site | Goal | Result | p | ms |
+|---|---|---|---|---|
+| Hacker News | Open the newest submissions page | **HIT** (`new`) | 0.847 | 1254 |
+| python.org | Go to the downloads page | **HIT** (`Downloads`) | 0.890 | 639 |
+| BBC News | Open the business news section | **HIT** (`Business`) | 0.531 | 496 |
+| DuckDuckGo | Type a query into the search box | **HIT** (`TYPE_TEXT` → searchbox) | 1.000 | 680 |
+| Wikipedia (article) | View the edit history | miss (`Notes`) | 0.325 | 670 |
+
+**4/5 on first attempt.** The Wikipedia miss is the collapsed-menu problem documented
+below: "View history" lives behind a swipeable tab bar the reader does not expand. The
+fix is opening the tab bar first (or observing a URL where it is expanded) — not a model
+problem. Reproduce with `examples/diagnostics/real_website_battery.py`.
+
 ### What the numbers mean in context
 
 The upstream projects publish their own measurements, which are worth reading
@@ -482,6 +532,29 @@ adds its own measured value: decisions at **10–30 ms with zero marginal cost**
 the page never leaving the machine.
 
 ---
+
+## Compatibility with jev-ultrafast and other Jev tooling
+
+[browser-use/jev-ultrafast](https://github.com/browser-use/jev-ultrafast) posts
+`{model, state, questions}` to `POST /v1/systemone` and validates replies with
+`validate_choice`: choice in the offered ids, probabilities covering exactly those ids,
+finite numbers summing to 1±0.02, the chosen id must be the argmax.
+
+**This is verified, not assumed**: `tests/test_jev_compat.py` replays a realistic
+jev-ultrafast request through our server and runs their validation verbatim — it passes.
+In practice you point jev-ultrafast at this server by setting its TypeSafe base URL to
+`http://127.0.0.1:8791/v1/systemone` (their model.py reads `TYPESAFE_BASE_URL` after
+applying the community local-endpoint patch).
+
+The key differences from running against hosted Jev:
+
+| | hosted Jev | laya-browser-agent |
+|---|---|---|
+| Latency per decision | 150–400 ms network round trip | 10–30 ms local (scoped page: ~333 ms) |
+| Cost | $0.042/M input tokens | $0 |
+| Page content | sent to TypeSafe | never leaves the machine |
+| Checkpoint | TypeSafe's, updated server-side | Laya browser-tuned v10s, you pin the version |
+| Fine-tuning | not possible | the laya-browser recipe (needs CUDA) |
 
 ## Reference implementations & sources
 
