@@ -12,6 +12,10 @@ BATCHES=(
   "TestObservationReader"
   "TestDecisionsOnRealElements"
   "TestMultilingual"
+  "TestShadowDOM"
+  "TestHiddenMenus"
+  "TestRTLAndExtendedScripts"
+  "TestGroundingMultiLanguage"
   "TestFlows"
 )
 

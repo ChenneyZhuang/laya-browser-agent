@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="th"><head><meta charset="utf-8"><title>Tough Pages</title>
+<style>
+body{font-family:system-ui;margin:2rem}
+.shadow-host{position:relative}
+.dropdown-menu{display:none}
+.dropdown-menu.open{display:block}
+.overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:10}
+.modal{position:fixed;top:30%;left:30%;background:#fff;z-index:11;padding:1rem;border:1px solid #000}
+iframe{width:100%;height:120px;border:1px solid #ccc}
+canvas{border:1px solid #000}
+[aria-hidden="true"]{color:#999}
+</style>
+</head>
+<body>
+
+<h1>Tough Pages: cases that break naive readers</h1>
+
+<!-- 1. Shadow DOM: buttons inside a shadow root are invisible to querySelectorAll -->
+<section>
+  <h2>1. Shadow DOM</h2>
+  <div class="shadow-host" id="shadow-host"></div>
+  <script>
+    const host = document.getElementById('shadow-host');
+    const root = host.attachShadow({mode: 'open'});
+    root.innerHTML = '<button id="shadow-btn">Shadow button</button><input id="shadow-input" placeholder="Shadow input">';
+  </script>
+</section>
+
+<!-- 2. Dropdown menu: hidden until parent clicked (the Wikipedia Contents problem) -->
+<section>
+  <h2>2. Hidden dropdown menu</h2>
+  <button id="menu-toggle" onclick="document.getElementById('dropdown-menu').classList.toggle('open')">Open menu ▾</button>
+  <div class="dropdown-menu" id="dropdown-menu">
+    <a href="#item-1" id="menu-item-1">Menu item one</a>
+    <a href="#item-2" id="menu-item-2">Menu item two</a>
+  </div>
+</section>
+
+<!-- 3. Overlay + modal: covers lower z-index content -->
+<section>
+  <h2>3. Modal overlay</h2>
+  <button id="under-overlay" onclick="document.getElementById('overlay-wrap').classList.add('shown')">Show button under overlay</button>
+  <div id="overlay-wrap"></div>
+  <script>
+    document.getElementById('overlay-wrap').innerHTML =
+      '<button id="before-overlay">Before overlay</button>';
+  </script>
+  <button id="open-modal" onclick="document.getElementById('modal-root').innerHTML='<div class=overlay></div><div class=modal id=modal-content><button id=modal-confirm>Confirm in modal</button></div>'">Open modal</button>
+  <div id="modal-root"></div>
+</section>
+
+<!-- 4. iframe: content in a child document -->
+<section>
+  <h2>4. iframe (same-origin)</h2>
+  <iframe id="frame" srcdoc='<button id="iframe-btn">Button inside iframe</button><input placeholder="iframe input"></input>'></iframe>
+</section>
+
+<!-- 5. Canvas: pixels only, no DOM to read -->
+<section>
+  <h2>5. Canvas</h2>
+  <canvas id="c" width="200" height="60"></canvas>
+  <script>const c=document.getElementById('c').getContext('2d');c.font='16px system-ui';c.fillText('I am canvas text, unclickable',10,30);</script>
+  <p>Below: an invisible-to-AT canvas game.</p>
+</section>
+
+<!-- 6. aria-hidden + negative tabindex -->
+<section>
+  <h2>6. Accessibility hints</h2>
+  <button aria-hidden="true" id="aria-hidden-btn">aria-hidden button</button>
+  <button id="normal-btn">Normal button</button>
+</section>
+
+<!-- 7. Very long labels (token budget killers) -->
+<section>
+  <h2>7. Long labels</h2>
+  <button id="long-label">This is an extremely long label that goes on and on and on, containing an enormous amount of text that would consume the entire token budget for other options if it were not truncated, which is why label truncation exists as a feature.</button>
+</section>
+
+<!-- 8. Tiny hit targets + offscreen -->
+<section>
+  <h2>8. Positional traps</h2>
+  <div style="height:2000px;background:#eee">scroll space <button id="deep-btn" style="margin-top:1800px">Deep button (needs scroll)</button></div>
+</section>
+
+</body>
+</html>
