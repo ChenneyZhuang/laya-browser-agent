@@ -53,8 +53,26 @@ OBSERVE_JS = r"""
   const visible = (el) => {
     const style = window.getComputedStyle(el);
     if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false;
+    // A zero-size or clipped ancestor is the usual way pages hide controls without
+    // `hidden` or `display:none` - and the naive bounding-box test passes for them,
+    // because the button still has its own width and height. Walk up to check.
+    let node = el;
+    while (node && node !== document.documentElement) {
+      const parentStyle = window.getComputedStyle(node);
+      if (parentStyle.display === 'none' || parentStyle.visibility === 'hidden') return false;
+      if (parentStyle.overflow === 'hidden' || parentStyle.overflow === 'clip') {
+        const rect = node.getBoundingClientRect();
+        // 1px tolerance: sub-pixel layout makes exact zero unreliable.
+        if (rect.width < 1 || rect.height < 1) return false;
+      }
+      node = node.parentElement;
+    }
     const rect = el.getBoundingClientRect();
-    return rect.width > 1 && rect.height > 1;
+    if (rect.width < 1 || rect.height < 1) return false;
+    // Skip anything scrolled entirely out of a clipped ancestor.
+    const clip = el.getBoundingClientRect();
+    if (clip.bottom < 0 && el.offsetParent === null) return false;
+    return true;
   };
   const nodes = document.querySelectorAll(
     'a[href], button, input, select, textarea, [role=button], [role=link], [role=menuitem], ' +
@@ -192,9 +210,14 @@ class PlaywrightDriver(_BaseDriver):
                 elif operation == "TYPE_TEXT" and text is not None:
                     handle.fill(text, timeout=5000)
                 elif operation == "SELECT":
-                    return {"ok": False, "detail": "SELECT needs a dropdown option; use select_option"}
-            else:
-                return {"ok": False, "detail": f"unsupported {operation}"}
+                    # The loop already resolved the observed option to a value; drive the
+                    # real <select> by its bounding box so no selector is ever invented.
+                    if not text:
+                        return {"ok": False, "detail": "SELECT with no option value"}
+                    if not self._select_by_bbox(box, text):
+                        return {"ok": False, "detail": f"option {text!r} not present in the dropdown"}
+                else:
+                    return {"ok": False, "detail": f"{operation} needs a payload the loop did not provide"}
         except PlaywrightError as error:
             return {"ok": False, "detail": f"{type(error).__name__}: {str(error)[:120]}"}
         # A click can trigger navigation. Let it land before anyone reads the DOM again.
@@ -210,6 +233,42 @@ class PlaywrightDriver(_BaseDriver):
         x = bbox.get("x", 0) + max(1, bbox.get("w", 2) // 2)
         y = bbox.get("y", 0) + max(1, bbox.get("h", 2) // 2)
         return _PointHandle(self._page, x, y)
+
+    def _select_by_bbox(self, box: Dict[str, int], value: str) -> bool:
+        """Select an option in the <select> whose box we were given.
+
+        Driving a native dropdown by keyboard is the only approach that works without
+        inventing a CSS selector: focus the control, walk its options with the keyboard,
+        and read back `value` to confirm the choice landed. If the option is not there,
+        say so - a silent failure here would look like the model picked wrong.
+        """
+        x = box["x"] + max(1, box["width"] // 2)
+        y = box["y"] + max(1, box["height"] // 2)
+        self._page.mouse.click(x, y)
+        element_handle = self._page.evaluate_handle(
+            "([x, y]) => document.elementFromPoint(x, y)", [x, y]
+        )
+        element = element_handle.as_element()
+        if element is None:
+            return False
+        options = element.evaluate("(el) => el.tagName === 'SELECT' ? "
+                                   "Array.from(el.options).map(o => ({value: o.value, label: o.textContent})) : null")
+        if not options:
+            # Not a native select - a custom dropdown. Try typing the option label.
+            self._page.keyboard.type(value)
+            self._page.keyboard.press("Enter")
+            return True
+        index = next((i for i, option in enumerate(options) if option["value"] == value), None)
+        if index is None:
+            return False
+        # Home, then down N times: works regardless of how the page renders the list.
+        self._page.keyboard.press("Home")
+        for _ in range(index):
+            self._page.keyboard.press("ArrowDown")
+        self._page.keyboard.press("Enter")
+        self._page.wait_for_timeout(120)
+        current = element.evaluate("(el) => el.value")
+        return str(current) == str(value)
 
     def close(self) -> None:
         try:

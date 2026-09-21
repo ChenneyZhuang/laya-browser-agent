@@ -33,7 +33,16 @@ class Driver(Protocol):
         ...
 
     def execute(self, operation: str, element: Optional["ElementRef"], text: Optional[str] = None) -> Dict[str, Any]:
-        """Perform the operation. Return {"ok": bool, "detail": str, "page_changed": bool}."""
+        """Perform the operation. Return {"ok": bool, "detail": str, "page_changed": bool}.
+
+        `text` carries the payload for the operations that need one:
+
+        * `TYPE_TEXT` - the string to enter
+        * `SELECT`    - the option *value* to choose (already resolved from the observed
+                        option list by the loop, so the driver never guesses)
+
+        It is None for every other operation.
+        """
         ...
 
     def close(self) -> None:
@@ -49,6 +58,9 @@ class ElementRef:
     role: str = ""
     handle: Any = None
     meta: Dict[str, Any] = field(default_factory=dict)
+    # Observed dropdown choices, each {"index": "3:1", "label": ..., "value": ...}.
+    # Carried so SELECT can resolve an option without re-reading the page.
+    options: List[Dict[str, str]] = field(default_factory=list)
 
 
 @dataclass
@@ -132,6 +144,7 @@ class BrowserDecider:
         on_step: Optional[Callable[[Step], None]] = None,
         text_chars: int = 1200,
         scope: Optional[Scope] = None,
+        min_confidence: float = 0.15,
     ) -> None:
         self.decider = decider or Decider()
         self.max_steps = max_steps
@@ -144,6 +157,10 @@ class BrowserDecider:
         # Scoping is the single biggest lever on both latency and accuracy: 20 elements
         # decide in ~330 ms, 120 elements take ~1.2 s and make more mistakes.
         self.scope = scope if scope is not None else Scope()
+        # Measured: on an ambiguous page the checkpoint fired a submit button with 6%
+        # confidence. Acting on a near-coin-flip is worse than not acting, so anything under
+        # this bar is refused. Set 0.0 to disable, or raise it in high-stakes flows.
+        self.min_confidence = min_confidence
 
     def run(self, driver: Driver, goal: str) -> Run:
         run = Run(goal=goal)
@@ -194,7 +211,10 @@ class BrowserDecider:
                             self._emit(step)
                             run.stopped, run.error = "error", "hallucinated target"
                             return run
-                        element = ElementRef(found.index, found.label, found.role, found.handle, found.meta)
+                        element = ElementRef(found.index, found.label, found.role, found.handle,
+                                             {**found.meta, "checked": found.checked,
+                                              "options": found.options},
+                                             options=list(found.options))
                         confidence = min(confidence, answers.confidence(question_name))
                     else:
                         step = Step(number, operation, None, "", confidence, decision.latency_ms, False,
@@ -221,6 +241,25 @@ class BrowserDecider:
                     run.stopped, run.error = "error", f"unsupported operation {operation!r}"
                     return run
 
+                # Confidence gate: a decision the model is unsure about is not an action.
+                # Measured: on an ambiguous page the checkpoint proposed CLICK on a submit
+                # button with p=0.06. Executing that is worse than asking again, and worse
+                # still than letting the caller take over, so low-confidence steps are
+                # refused and recorded. DONE/BLOCKED are exempt: stopping is always safe.
+                if operation not in ("DONE", "BLOCKED") and confidence < self.min_confidence:
+                    run.steps.append(Step(number, operation, target, element.label if element else "",
+                                          confidence, decision.latency_ms, False,
+                                          detail=f"refused: confidence {confidence:.2f} below {self.min_confidence:.2f}"))
+                    self._emit(run.steps[-1])
+                    history.append({"action": operation, "kind": operation.lower(), "target": target,
+                                    "text": None, "page_changed": False})
+                    low = sum(1 for s in run.steps if "below" in s.detail)
+                    if low >= 2:
+                        run.stopped, run.error = "error", (
+                            f"model is not confident enough to act (last: {confidence:.2f})")
+                        return run
+                    continue
+
                 # Human gate: irreversible-looking actions stop here unless the caller
                 # has supplied a confirmation callback that says yes.
                 if operation in ("CLICK", "TYPE_TEXT", "SELECT") and self._looks_risky(element, goal):
@@ -230,6 +269,23 @@ class BrowserDecider:
                         self._emit(run.steps[-1])
                         run.stopped = "needs_confirmation"
                         return run
+
+                # Toggle guard: measured on the real checkpoint, a small decision model will
+                # confidently click a checkbox that is ALREADY in the requested state (p=0.90
+                # on `checked=true` with "tick the terms box" as the goal), even though the
+                # option text says `checked=true` and the instructions say not to re-toggle.
+                # That click would silently UNDO the user's intention, so the harness refuses
+                # it and asks for a fresh decision instead. Same idea as the loop guard: the
+                # model proposes, the harness checks what the proposal would actually do.
+                if operation == "CLICK" and element is not None and element.meta.get("checked") is True:
+                    if self._goal_wants_unticked(goal) is False:  # goal wants it ticked; it is
+                        run.steps.append(Step(number, operation, target, element.label,
+                                              confidence, decision.latency_ms, False,
+                                              detail="refused: would untick an already-checked control"))
+                        self._emit(run.steps[-1])
+                        history.append({"action": operation, "kind": "click", "target": target,
+                                        "text": None, "page_changed": False})
+                        continue
 
                 text: Optional[str] = None
                 if operation == "TYPE_TEXT":
@@ -247,6 +303,40 @@ class BrowserDecider:
                         run.stopped, run.error = "error", "no text for TYPE_TEXT"
                         return run
 
+                # A dropdown is two answers: which field, and which option inside it. The
+                # option matters, so fetch it here rather than letting the driver guess.
+                option: Optional[str] = None
+                if operation == "SELECT":
+                    if "select_option" not in answers.raw:
+                        run.steps.append(Step(number, operation, target, element.label if element else "",
+                                              confidence, decision.latency_ms, False,
+                                              detail="SELECT chosen but the page offered no dropdown options"))
+                        self._emit(run.steps[-1])
+                        run.stopped, run.error = "error", "SELECT without observable options"
+                        return run
+                    option_key = answers.choice("select_option")
+                    matched = None
+                    for candidate in (element.meta.get("options") if element else None) or []:
+                        if str(candidate.get("index")) == str(option_key):
+                            matched = candidate
+                            break
+                    if matched is None:
+                        run.steps.append(Step(number, operation, target, element.label if element else "",
+                                              confidence, decision.latency_ms, False,
+                                              detail=f"option {option_key!r} was not in the observed dropdown"))
+                        self._emit(run.steps[-1])
+                        run.stopped, run.error = "error", "hallucinated dropdown option"
+                        return run
+                    option = str(matched.get("value") or matched.get("label") or "")
+                    if not option:
+                        run.steps.append(Step(number, operation, target, element.label if element else "",
+                                              confidence, decision.latency_ms, False,
+                                              detail="observed dropdown option has no value"))
+                        self._emit(run.steps[-1])
+                        run.stopped, run.error = "error", "empty dropdown option"
+                        return run
+                    confidence = min(confidence, answers.confidence("select_option"))
+
                 # Loop guard: same operation on the same target twice with no page change.
                 repeats = sum(1 for item in history[-2:]
                               if item.get("action") == operation and item.get("target") == target
@@ -259,7 +349,10 @@ class BrowserDecider:
                     return run
 
                 try:
-                    result = driver.execute(operation, element, text) or {}
+                    # `text` doubles as the payload for SELECT (the option value): one
+                    # param, because both are "the string this operation needs".
+                    payload = text if operation != "SELECT" else option
+                    result = driver.execute(operation, element, payload) or {}
                 except Exception as error:  # a driver failure is not the model's fault
                     step = Step(number, operation, target, element.label if element else "",
                                 confidence, decision.latency_ms, False, detail=f"driver error: {error}")
@@ -287,6 +380,27 @@ class BrowserDecider:
     def _looks_risky(self, element: Optional[ElementRef], goal: str) -> bool:
         haystack = f"{element.label if element else ''} {goal}".lower()
         return any(hint in haystack for hint in RISKY_HINTS)
+
+    # Words that mean "this control should end up checked". Anything else (uncheck, clear,
+    # opt out, deselect, disable) means the opposite, and asked-for-unticking is honoured.
+    _WANT_TICKED = ("tick", "check", "enable", "opt in", "turn on", "select the", "agree", "accept")
+    _WANT_UNTICKED = ("untick", "uncheck", "unselect", "deselect", "disable", "opt out",
+                      "turn off", "clear the", "remove the check", "disagree")
+
+    def _goal_wants_unticked(self, goal: str) -> Optional[bool]:
+        """What does the goal want done to a checkbox: False = check it, True = uncheck it.
+
+        Returns None when the goal does not say, in which case the toggle guard stands down -
+        refusing an action on an ambiguous goal would be worse than letting it through.
+        """
+        lowered = (goal or "").lower()
+        for word in self._WANT_UNTICKED:
+            if word in lowered:
+                return True
+        for word in self._WANT_TICKED:
+            if word in lowered:
+                return False
+        return None
 
     def _emit(self, step: Step) -> None:
         if self.on_step is not None:

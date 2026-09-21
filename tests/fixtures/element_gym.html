@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Element Gym</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 2rem; max-width: 46rem; }
+  section { border: 1px solid #ccc; padding: 1rem; margin: 1rem 0; border-radius: 6px; }
+  h2 { font-size: 1rem; margin: 0 0 .6rem; color: #555; text-transform: uppercase; letter-spacing: .05em; }
+  button, input, select { font-size: 1rem; padding: .3rem .5rem; }
+  [hidden] { display: none; }
+  label { display: block; margin: .3rem 0; }
+</style>
+</head>
+<body>
+<h1>Element Gym</h1>
+<p>Every interactive element family the observation reader must handle, on one page.</p>
+
+<section id="buttons">
+  <h2>1. Buttons and links</h2>
+  <button id="plain">Plain button</button>
+  <button id="disabled" disabled>Disabled button</button>
+  <a href="#target-anchor" id="link">A normal link</a>
+  <a href="#" id="js-link" onclick="document.getElementById('link-result').textContent='js link clicked'; return false;">Link with onclick</a>
+  <span id="link-result"></span>
+  <div role="button" tabindex="0" id="aria-button" onclick="document.getElementById('aria-result').textContent='aria button clicked'">ARIA role=button</div>
+  <span id="aria-result"></span>
+</section>
+
+<section id="fields">
+  <h2>2. Text fields</h2>
+  <label for="name">Full name</label>
+  <input type="text" id="name" placeholder="Type your name">
+  <label for="email">Email address</label>
+  <input type="email" id="email">
+  <label for="notes">Notes (textarea)</label>
+  <textarea id="notes" rows="2"></textarea>
+  <label for="searchbox" role="searchbox">Search the docs</label>
+  <input type="search" id="searchbox">
+  <label for="readonly-field">Read-only field</label>
+  <input type="text" id="readonly-field" value="cannot change" readonly>
+</section>
+
+<section id="checkboxes">
+  <h2>3. Checkboxes, radios, switches</h2>
+  <label><input type="checkbox" id="cb-unchecked"> Newsletter (unchecked)</label>
+  <label><input type="checkbox" id="cb-checked" checked> Terms accepted (checked)</label>
+  <label><input type="radio" name="plan" id="radio-basic" value="basic"> Basic plan</label>
+  <label><input type="radio" name="plan" id="radio-pro" value="pro"> Pro plan</label>
+  <label><input type="checkbox" role="switch" id="switch" value="on"> Dark mode (switch)</label>
+</section>
+
+<section id="dropdowns">
+  <h2>4. Selects</h2>
+  <label for="country">Country</label>
+  <select id="country">
+    <option value="">-- choose --</option>
+    <option value="AU">Australia</option>
+    <option value="JP">Japan</option>
+    <option value="DE">Germany</option>
+  </select>
+  <label for="size">T-shirt size</label>
+  <select id="size">
+    <option value="s">Small</option>
+    <option value="m">Medium</option>
+    <option value="l">Large</option>
+  </select>
+  <label for="multi">Interests (multiple)</label>
+  <select id="multi" multiple size="3">
+    <option value="a">Alpha</option>
+    <option value="b">Beta</option>
+    <option value="c">Gamma</option>
+  </select>
+</section>
+
+<section id="hidden-things">
+  <h2>5. Things that must NOT be offered as targets</h2>
+  <input type="hidden" id="hidden" value="secret">
+  <button hidden id="hidden-button">Hidden button</button>
+  <button style="display:none" id="display-none">display:none button</button>
+  <button style="visibility:hidden" id="invisible">visibility:hidden button</button>
+  <div style="width:0;height:0;overflow:hidden"><button id="zero-size">Zero-size button</button></div>
+  <p>Only the visible controls above should appear in an observation.</p>
+</section>
+
+<section id="dynamic">
+  <h2>6. Dynamic content</h2>
+  <button id="reveal" onclick="document.getElementById('hidden-panel').removeAttribute('hidden')">Reveal more options</button>
+  <div id="hidden-panel" hidden>
+    <button id="panel-option">Secret panel option</button>
+  </div>
+  <button id="grow" onclick="const d=document.createElement('button');d.id='added-'+(document.querySelectorAll('#grow-list button').length+1);d.textContent='Added option '+(document.querySelectorAll('#grow-list button').length+1);document.getElementById('grow-list').appendChild(d)">Add an option</button>
+  <div id="grow-list"></div>
+</section>
+
+<section id="progress">
+  <h2>7. Non-interactive content that looks interactive</h2>
+  <progress value="0.6" max="1"></progress>
+  <input type="range" id="slider" min="0" max="100" value="50">
+  <p id="long-text">Some prose that mentions a button, a link, and a dropdown, purely as text.</p>
+</section>
+
+<section id="anchor-target">
+  <h2>8. Anchor target</h2>
+  <div id="target-anchor"><button id="last-button">Final button</button></div>
+</section>
+
+</body>
+</html>

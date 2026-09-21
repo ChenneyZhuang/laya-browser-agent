@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Flow Shop</title>
+<style>body{font-family:system-ui;margin:2rem;max-width:40rem}fieldset{border:1px solid #ccc;padding:1rem;margin:1rem 0}
+.hidden{display:none}.error{color:#b00}</style>
+<script>
+const state = {step: 1, cart: [], errors: []};
+function show(id){document.querySelectorAll('.step').forEach(s=>s.classList.add('hidden'));document.getElementById(id).classList.remove('hidden');}
+function next(id){state.step++;show(id);}
+function addToCart(item){state.cart.push(item);document.getElementById('cart-count').textContent=state.cart.length;}
+function validateCard(){
+  const num = document.getElementById('card').value.replace(/\s/g,'');
+  if(!/^\d{16}$/.test(num)){document.getElementById('card-error').textContent='Card number must be 16 digits';state.errors.push('card');return false;}
+  document.getElementById('card-error').textContent='';return true;
+}
+function submitOrder(){
+  if(!validateCard()) return false;
+  document.getElementById('confirm-msg').textContent='Order placed: '+state.cart.join(', ');
+  next('step-done'); return false;
+}
+</script>
+</head>
+<body>
+
+<h1>Flow Shop</h1>
+<p>Cart: <span id="cart-count">0</span> item(s) &middot; Step <span id="step-num">1</span></p>
+
+<!-- Step 1: search for a product (TYPE_TEXT then CLICK submit) -->
+<fieldset class="step" id="step-search">
+  <legend>Step 1 — Find a product</legend>
+  <label for="q">Search products</label>
+  <input type="text" id="q" placeholder="e.g. kettle">
+  <button id="do-search" onclick="document.getElementById('results').classList.remove('hidden')">Search</button>
+  <div id="results" class="hidden">
+    <button id="result-1" onclick="addToCart('Steel Kettle')">Steel Kettle — $29</button>
+    <button id="result-2" onclick="addToCart('Glass Teapot')">Glass Teapot — $41</button>
+    <button id="result-3" onclick="addToCart('Mug Set')">Mug Set — $18</button>
+  </div>
+</fieldset>
+
+<!-- Step 2: cart actions -->
+<fieldset class="step hidden" id="step-cart">
+  <legend>Step 2 — Confirm basket</legend>
+  <button id="checkout" onclick="next('step-payment')">Checkout</button>
+  <button id="continue">Continue shopping</button>
+</fieldset>
+
+<!-- Step 3: payment (risky words, should trip the confirm gate) -->
+<fieldset class="step hidden" id="step-payment">
+  <legend>Step 3 — Payment</legend>
+  <label for="card">Card number</label>
+  <input type="text" id="card" placeholder="16 digits">
+  <span id="card-error" class="error"></span>
+  <button id="pay-now" onclick="return submitOrder()">Pay now</button>
+</fieldset>
+
+<!-- Step 4: done -->
+<fieldset class="step hidden" id="step-done">
+  <legend>Done</legend>
+  <p id="confirm-msg"></p>
+</fieldset>
+
+<!-- A destructive action elsewhere on the page, to test the risky gate -->
+<fieldset>
+  <legend>Account</legend>
+  <button id="delete-account" onclick="document.getElementById('del-msg').textContent='deleted'">Delete my account</button>
+  <span id="del-msg"></span>
+</fieldset>
+
+</body>
+</html>

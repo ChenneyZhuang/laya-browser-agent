@@ -313,6 +313,20 @@ and the failure is indistinguishable from a model error. Therefore scoping here 
 it looks like. Ten tests cover this (`TestScope`), including the one that caught a
 quote-handling bug (`'random` / `article'`) that silently disabled the protection.
 
+### Three things the model gets wrong, and what the harness does about it
+
+These were found by testing the real checkpoint against real pages, and each one is now
+either guarded or documented — not hidden.
+
+| Finding | Evidence | Harness response |
+|---|---|---|
+| **It will undo a checkbox.** Asked to tick an already-ticked box, it answers `CLICK` on that box at p=0.90. The option text reads `checked=true` and the instructions say not to re-toggle — neither helps. | `[1] Terms accepted (checked)` → `CLICK` target 1, p=0.904 | **Toggle guard**: a click on a control already in the requested state is refused and the model is asked again. If the goal explicitly asks to *uncheck*, it goes through. |
+| **It fires submits at near-zero confidence.** On an ambiguous page it proposed `CLICK` on a submit button with **p=0.06**, which would start a flow the user never asked for. | live flow run: `CLICK Search, confidence 0.0609` | **Confidence gate**: any action below `min_confidence` (default 0.15) is refused, twice in a row ends the run. `DONE`/`BLOCKED` are exempt — refusing to *stop* would be the worse failure. |
+| **Page text steers it more than instructions do.** With identical options, a state whose text echoes the field and button names pushed `CLICK` to p=0.976; a neutral state gave `TYPE_TEXT` at p≈0.93. The *instruction wording* made almost no difference across four variants. | `instruction_ablation.py`, `state_ablation.py`, `text_priming.py` | **Scope the state, not the prompt.** `text_chars` and element scoping are the real knobs; the diagnostics in `examples/diagnostics/` reproduce every number above. |
+
+The third one is the most useful lesson for anyone tuning this: **the option list and the
+page text do the work; prompts do not.**
+
 ### What the numbers mean in context
 
 The upstream projects publish their own measurements, which are worth reading
@@ -385,9 +399,19 @@ credited above and in code comments at the site where each one is used.
 - **Wide pages degrade.** Beyond ~20 options the harness chunks automatically, but a
   200-element page is still a harder decision than an 8-element one; prefer scoping
   the observation.
-- **The safety gates are hints, not guarantees.** `RISKY_HINTS` is a keyword list.
-  Do not run unattended against anything that can spend money, send messages, or
-  delete data without a `confirm` callback that actually checks.
+- **The safety gates are hints, not guarantees.** `RISKY_HINTS` and the toggle-guard
+  vocabulary are keyword lists. Do not run unattended against anything that can spend
+  money, send messages, or delete data without a `confirm` callback that actually checks.
+- **It will undo a checkbox if you let it.** Proven, measured, p=0.90. The toggle guard
+  refuses it, but the guard reads the goal's wording - a goal phrased ambiguously may do
+  the opposite of what you meant. Test your phrasings.
+- **Confidence is not correctness.** The gate refuses low-confidence actions, which stops
+  the worst case, but a confident wrong answer is not caught by anything here. Verify
+  outcomes in your own code when the stakes are real.
+- **A clean page state matters more than a clever prompt.** Measured four ways: the same
+  options produced `TYPE_TEXT` at p≈0.93 in a neutral state and `CLICK` at p≈0.98 when the
+  page text echoed the button's name. If behaviour looks wrong, change what you observe
+  before you change what you ask.
 
 ## Project layout
 
@@ -413,13 +437,62 @@ examples/diagnostics/   the measurement scripts behind the benchmark tables
 git clone https://github.com/ChenneyZhuang/localdecide
 cd localdecide
 python3.12 -m venv .venv && .venv/bin/pip install -e '.[all]' pytest
-.venv/bin/python -m pytest tests/ -q        # 39 tests, ~0.02 s, no model required
+.venv/bin/python -m pytest tests/test_contract.py -q   # 48 tests, instant, no model needed
 .venv/bin/localdecide doctor
 ```
 
-The test suite deliberately runs against a fake backend, so it verifies the *harness*
-rules (validation, fail-open, index resolution, loop guards, confirmation) rather than
-anyone's checkpoint quality. Model behaviour is measured in [Benchmarks](#benchmarks).
+### Testing philosophy
+
+Two suites, deliberately separated:
+
+| Suite | What it proves | Needs |
+|---|---|---|
+| `tests/test_contract.py` | the **harness** rules: answer validation, fail-open, index resolution, loop guards, confidence gate, toggle guard, scoping. Runs in ~0.2 s against fake backends. | nothing |
+| `tests/test_live.py` | the **real checkpoint in a real Chromium** against fixture pages: element families, multilingual labels, multi-step flows, the safety gates end to end. | a model runtime + `playwright install chromium` |
+
+The live suite is skipped by default (`LOCALDECIDE_SKIP_LIVE=1` forces it off) so an
+ordinary test run cannot load a checkpoint.
+
+**Run the live suite in batches, not all at once:**
+
+```bash
+./scripts/run_live_batched.sh
+```
+
+That script exists for a real reason. A full live run puts a model checkpoint and a
+Chromium on the machine at once, and on a 16 GB laptop that was enough to trigger a
+kernel watchdog panic and reboot it. Batching keeps the peak low, the script aborts if
+free memory drops below 25%, and the browser work runs in a subprocess
+(`tests/_browser_child.py`) that asks this process for decisions over a pipe — one
+checkpoint resident per machine, never two. `TestMemorySafety` encodes these rules as
+tests so the mistake is not repeated.
+
+### Fixture pages
+
+`tests/fixtures/` holds pages built to break an observation reader, not to look nice:
+
+- `element_gym.html` — every interactive element family, plus hidden/zero-size/disabled
+  controls that must **not** be offered.
+- `multilingual.html` — labels in Chinese, Japanese, Korean, Arabic (RTL), Russian,
+  Greek, Thai, Hindi, Vietnamese, Turkish, and emoji-prefixed English.
+- `flow_shop.html` — a 4-step flow (search → basket → payment → done) with a destructive
+  action and a payment step to exercise the confirmation gate.
+
+### Diagnostics
+
+`examples/diagnostics/` is where the claims in [Benchmarks](#benchmarks) come from. Every
+one is runnable, and each answers a specific question:
+
+| Script | Question it answers |
+|---|---|
+| `observation_profile.py` | how many elements does the reader see, and where does latency go |
+| `scope_effect.py` | what scoping actually buys |
+| `instruction_ablation.py` | does instruction wording change the answer (mostly no) |
+| `state_ablation.py` | does page text change the answer (yes, a lot) |
+| `text_priming.py` | which specific words in the page text cause the wrong answer |
+| `type_text_bias.py` | why a search flow submits before filling the field |
+| `checkbox_probe.py` | the checkbox-undoing behaviour, in isolation |
+| `check_hidden.py` | hidden elements are excluded from the observation |
 
 ## License
 

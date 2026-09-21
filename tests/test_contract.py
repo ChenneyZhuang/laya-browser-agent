@@ -322,12 +322,6 @@ class TestLoop(unittest.TestCase):
         self.assertTrue(any(step.failed_open for step in run.steps))
 
     def test_loop_refuses_an_index_that_vanished(self):
-        """Defense in depth: even if an invalid index got past validation, the loop refuses it.
-
-        This cannot happen through the normal path (validation runs against the questions
-        built from the same table), which is exactly why the loop check exists - it holds
-        even if someone swaps in a decision source that skips validation.
-        """
         result = Decider(backend=FakeBackend(), retries=0).decide("s", {"x": choice("q", {"1": "a", "2": "b"})})
         assert result.answers is not None
         # Forge a validated-looking answer naming an index the table does not contain.
@@ -474,6 +468,179 @@ class TestCoarseToFine(unittest.TestCase):
         self.assertIn("pick__chunk0", first_pass)
         self.assertLessEqual(len(first_pass["pick__chunk0"]["criteria"]), 20)
         self.assertGreaterEqual(len(backend.calls), 2)  # a second pass for the winners
+
+
+
+
+class TestToggleGuard(unittest.TestCase):
+    """The harness refuses to click a control that is already in the requested state.
+
+    Measured on the real checkpoint: asked to "tick the Terms accepted box" when the box is
+    already checked, the model answers CLICK on that very box with p=0.90 - it would untick
+    it. The option text said `checked=true` and the instructions said not to re-toggle, and
+    neither was enough. So the guard lives in the harness, where it can be tested.
+    """
+
+    def observation(self):
+        return {"url": "https://x", "title": "T", "text": "", "actions": [
+            {"kind": "click", "node": "n1", "label": "Terms accepted (checked)", "role": "checkbox",
+             "checked": True},
+            {"kind": "click", "node": "n2", "label": "Newsletter (unchecked)", "role": "checkbox",
+             "checked": False},
+        ]}
+
+    def test_clicking_a_checked_box_is_refused(self):
+        backend = _SequenceBackend([
+            {"operation": "CLICK", "click_target": "1"},   # the checked one
+            {"operation": "DONE"},
+        ])
+        driver = FakeDriver([self.observation()])
+        run = BrowserDecider(decider=Decider(backend=backend, retries=0), max_steps=3).run(
+            driver, "Tick the 'Terms accepted' checkbox.")
+        self.assertEqual(driver.executed, [], "the guard must prevent the undoing click")
+        refusal = [s for s in run.steps if "untick" in s.detail]
+        self.assertTrue(refusal, f"expected a refusal step; got {[s.detail for s in run.steps]}")
+
+    def test_unchecking_is_allowed_when_the_goal_asks_for_it(self):
+        backend = _SequenceBackend([
+            {"operation": "CLICK", "click_target": "1"},
+            {"operation": "DONE"},
+        ])
+        driver = FakeDriver([self.observation()])
+        BrowserDecider(decider=Decider(backend=backend, retries=0), max_steps=2).run(
+            driver, "Untick the terms checkbox.")
+        self.assertEqual(driver.executed, [("CLICK", "1", None)],
+                         "an explicit uncheck goal must go through")
+
+    def test_clicking_an_unchecked_box_still_works(self):
+        backend = _SequenceBackend([
+            {"operation": "CLICK", "click_target": "2"},
+            {"operation": "DONE"},
+        ])
+        driver = FakeDriver([self.observation()])
+        BrowserDecider(decider=Decider(backend=backend, retries=0), max_steps=2).run(
+            driver, "Subscribe to the newsletter.")
+        self.assertEqual(driver.executed, [("CLICK", "2", None)])
+
+    def test_ambiguous_goal_stands_the_guard_down(self):
+        """No instruction either way means no refusal - ambiguity must not block progress."""
+        backend = _SequenceBackend([
+            {"operation": "CLICK", "click_target": "1"},
+            {"operation": "DONE"},
+        ])
+        driver = FakeDriver([self.observation()])
+        BrowserDecider(decider=Decider(backend=backend, retries=0), max_steps=2).run(
+            driver, "Deal with the terms block on this page.")
+        self.assertEqual(driver.executed, [("CLICK", "1", None)])
+
+    def test_goal_wording_is_classified_correctly(self):
+        decider = BrowserDecider()
+        for goal, expected in (("tick the box", False), ("check the terms", False),
+                               ("accept the terms", False), ("untick that box", True),
+                               ("uncheck the newsletter", True), ("opt out", True),
+                               ("open the settings page", None)):
+            self.assertEqual(decider._goal_wants_unticked(goal), expected, f"misread {goal!r}")
+
+
+
+
+class TestConfidenceGate(unittest.TestCase):
+    """A near-coin-flip decision is refused rather than executed.
+
+    Measured on the real page: the checkpoint proposed CLICK on a submit button with p=0.06.
+    Acting on that starts a flow the user did not ask for. Stopping (`DONE`/`BLOCKED`) is
+    always allowed, because refusing to stop is the more dangerous failure.
+    """
+
+    def observation(self):
+        return {"url": "https://x", "title": "T", "text": "", "actions": [
+            {"kind": "click", "node": "n1", "label": "Submit", "role": "button"},
+            {"kind": "click", "node": "n2", "label": "Cancel", "role": "button"},
+        ]}
+
+    def test_low_confidence_action_is_refused(self):
+        """A backend that spreads probability nearly evenly produces ~0 confidence."""
+        class Unsure:
+            name = "unsure"
+
+            def answer(self, state, questions):
+                answers = {}
+                for name, question in questions.items():
+                    keys = list(question["criteria"])
+                    even = {key: round(1.0 / len(keys), 3) for key in keys}
+                    answers[name] = {"type": "choice", "choice": keys[0], "probabilities": even,
+                                     "confidence": 0.01, "action": {"act_probability": 1.0}}
+                return {"answers": answers, "usage": {}, "latency_ms": 1, "backend": self.name}
+
+        driver = FakeDriver([self.observation()])
+        run = BrowserDecider(decider=Decider(backend=Unsure(), retries=0), max_steps=4).run(driver, "do a thing")
+        self.assertEqual(driver.executed, [], "nothing should have been executed")
+        self.assertTrue(any("below" in s.detail for s in run.steps))
+        self.assertEqual(run.stopped, "error")
+
+    def test_confident_action_goes_through(self):
+        backend = _SequenceBackend([
+            {"operation": "CLICK", "click_target": "1"},
+            {"operation": "DONE"},
+        ])
+        driver = FakeDriver([self.observation()])
+        BrowserDecider(decider=Decider(backend=backend, retries=0), max_steps=2).run(driver, "do a thing")
+        self.assertEqual(driver.executed, [("CLICK", "1", None)])
+
+    def test_done_is_allowed_even_at_low_confidence(self):
+        """Stopping must never be blocked by the confidence gate."""
+        class UnsureDone:
+            name = "unsure-done"
+
+            def answer(self, state, questions):
+                answers = {}
+                for name, question in questions.items():
+                    keys = list(question["criteria"]) if isinstance(question.get("criteria"), dict) else []
+                    if name == "operation" and "DONE" in keys:
+                        probabilities = {k: (0.2 if k == "DONE" else 0.8 / max(1, len(keys) - 1)) for k in keys}
+                        answers[name] = {"type": "choice", "choice": "DONE", "probabilities": probabilities,
+                                         "confidence": 0.0, "action": {"act_probability": 1.0}}
+                    elif keys:
+                        answers[name] = {"type": "choice", "choice": keys[0],
+                                         "probabilities": {k: round(1.0 / len(keys), 3) for k in keys},
+                                         "confidence": 0.01, "action": {"act_probability": 1.0}}
+                return {"answers": answers, "usage": {}, "latency_ms": 1, "backend": self.name}
+
+        driver = FakeDriver([self.observation()])
+        run = BrowserDecider(decider=Decider(backend=UnsureDone(), retries=0), max_steps=2).run(driver, "do a thing")
+        self.assertEqual(run.stopped, "done", f"expected DONE to be honoured; got {run.stopped}")
+
+    def test_threshold_is_configurable(self):
+        """Raising the bar must block a decision that a low bar would allow.
+
+        `_SequenceBackend` answers with confidence 1.0, so it passes any threshold - the
+        blocking case needs a backend whose confidence sits between the two bars.
+        """
+        class Middling:
+            name = "middling"
+
+            def answer(self, state, questions):
+                answers = {}
+                for name, question in questions.items():
+                    keys = list(question["criteria"]) if isinstance(question.get("criteria"), dict) else []
+                    if not keys:
+                        continue
+                    # argmax is 0.5, so confidence is ~0.5: above the default, below 0.99
+                    probabilities = {key: (0.5 if index == 0 else 0.5 / (len(keys) - 1))
+                                     for index, key in enumerate(keys)} if len(keys) > 1 else {keys[0]: 1.0}
+                    answers[name] = {"type": "choice", "choice": keys[0], "probabilities": probabilities,
+                                     "confidence": 0.5, "action": {"act_probability": 1.0}}
+                return {"answers": answers, "usage": {}, "latency_ms": 1, "backend": self.name}
+
+        driver = FakeDriver([self.observation()])
+        BrowserDecider(decider=Decider(backend=Middling(), retries=0), max_steps=2,
+                       min_confidence=0.99).run(driver, "do a thing")
+        self.assertEqual(driver.executed, [], "a high threshold must block a 0.5-confidence flow")
+
+        driver2 = FakeDriver([self.observation()])
+        BrowserDecider(decider=Decider(backend=Middling(), retries=0), max_steps=1,
+                       min_confidence=0.2).run(driver2, "do a thing")
+        self.assertEqual(driver2.executed, [("CLICK", "1", None)], "a low threshold must allow it")
 
 
 if __name__ == "__main__":
