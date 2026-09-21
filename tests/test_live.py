@@ -476,18 +476,18 @@ class TestMemorySafety(unittest.TestCase):
 
     def test_suite_frees_the_model_between_test_modules(self):
         """The live suite must not keep a checkpoint alive while browsers run."""
-        source = (pathlib.Path(__file__).parent / "test_live.py").read_text()
+        source = (pathlib.Path(__file__).parent / "test_live.py").read_text(encoding="utf-8")
         self.assertIn("_browser_child", source,
                       "browser work must go through the subprocess helper, not run in-process")
 
     def test_browser_helpers_have_a_timeout(self):
-        source = (pathlib.Path(__file__).parent / "test_live.py").read_text()
+        source = (pathlib.Path(__file__).parent / "test_live.py").read_text(encoding="utf-8")
         self.assertIn("timeout=", source,
                       "every subprocess browser call needs a timeout so a hang cannot wedge the machine")
 
     def test_running_live_tests_is_optout_not_optin(self):
         """The live suite is skipped by default so a normal test run cannot melt the box."""
-        source = (pathlib.Path(__file__).parent / "test_live.py").read_text()
+        source = (pathlib.Path(__file__).parent / "test_live.py").read_text(encoding="utf-8")
         self.assertIn("LOCALDECIDE_SKIP_LIVE", source,
                       "the live suite must have an explicit escape hatch")
 

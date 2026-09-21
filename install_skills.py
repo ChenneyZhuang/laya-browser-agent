@@ -54,7 +54,7 @@ def install(dry_run: bool = False) -> int:
             if not dry_run:
                 destination.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(skill / "SKILL.md", destination / "SKILL.md")
-                (destination / MARKER).write_text(REPO.name + "\n")
+                (destination / MARKER).write_text(REPO.name + "\n", encoding="utf-8")
                 changed += 1
     print(f"{'would install' if dry_run else 'installed'} {changed} skill(s) into {len(targets)} agent(s)")
     return 0
