@@ -30,7 +30,25 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     import importlib.util
     import platform
 
-    print(f"python      {platform.python_version()} ({platform.machine()}, {platform.system()})")
+    machine, system = platform.machine(), platform.system()
+    print(f"python      {platform.python_version()} ({machine}, {system})")
+
+    # Hardware context: what this device CAN run decides which extras make sense.
+    chip = ""
+    if system == "Darwin" and machine == "arm64":
+        try:
+            import subprocess
+            chip = subprocess.run(["sysctl", "-n", "machdep.cpu.brand_string"],
+                                  capture_output=True, text=True, timeout=5).stdout.strip()
+            memory_gb = round(int(subprocess.run(["sysctl", "-n", "hw.memsize"],
+                                                 capture_output=True, text=True,
+                                                 timeout=5).stdout.strip()) / 2**30)
+            print(f"hardware    {chip}, {memory_gb} GB unified memory")
+        except Exception:
+            memory_gb = None
+    else:
+        memory_gb = None
+
     have_mlx = importlib.util.find_spec("laya_mlx") is not None
     have_torch = importlib.util.find_spec("laya") is not None
     print(f"laya-mlx    {'installed' if have_mlx else 'not installed'}"
@@ -40,14 +58,43 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     for name, module in (("playwright", "playwright"), ("websocket-client", "websocket")):
         found = importlib.util.find_spec(module) is not None
         print(f"{name:<11} {'installed' if found else 'not installed'}")
+
+    # Device-specific verdicts: below-M4 machines and 8 GB machines have real constraints,
+    # and telling people plainly beats letting them discover it by crash.
+    if system == "Darwin" and machine == "arm64" and not (have_mlx or have_torch):
+        print("\nNo local decision runtime yet. On this Mac:")
+        print("  pip install 'localdecide[mlx]'      # fastest path on Apple Silicon")
+    elif system == "Darwin" and machine == "x86_64" and not (have_mlx or have_torch):
+        print("\nNo local decision runtime yet. This is an Intel Mac - use the PyTorch runtime:")
+        print("  pip install 'localdecide[torch]'    # laya-mlx does not run on Intel Macs")
+    elif system == "Windows" and not (have_mlx or have_torch):
+        print("\nNo local decision runtime yet. On Windows:")
+        print("  pip install 'localdecide[torch]'")
+    elif system == "Linux" and not (have_mlx or have_torch):
+        print("\nNo local decision runtime yet. On Linux:")
+        print("  pip install 'localdecide[torch]'    # add CUDA torch if you have a GPU")
+
+    if memory_gb is not None and memory_gb < 10 and (have_mlx or have_torch):
+        print(f"\nnote: {memory_gb} GB is tight for a 650 MB checkpoint plus a browser. "
+              "The loop's subprocess design keeps one model OR one browser resident at a "
+              "time, but close other heavy apps during live runs.")
+
     if not (have_mlx or have_torch):
-        print("\nNo local decision runtime. Install one of the two above.")
         return 1
     try:
         decider = Decider()
         print(f"\nbackend     {getattr(decider.backend, 'name', '?')}")
-        print("ready. try:  localdecide table --observation obs.json --goal 'Open the login page'")
-        return 0
+        # A one-decision smoke test proves the checkpoint actually loads and answers,
+        # which is the part that fails in practice (first download, version mismatches).
+        result = decider.decide("The build finished and all tests passed.",
+                                {"ok": {"type": "noul", "instructions": "The text reports a successful outcome"}})
+        if result.ok and result.answers is not None:
+            latency = result.answers.latency_ms
+            print(f"smoke test  OK ({latency} ms, first call includes model load)")
+            print("ready. try:  localdecide table --observation obs.json --goal 'Open the login page'")
+            return 0
+        print(f"smoke test  FAILED: {result.error}")
+        return 1
     except Exception as error:
         print(f"\nbackend failed to resolve: {error}")
         return 1

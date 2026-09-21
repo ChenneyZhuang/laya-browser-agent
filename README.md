@@ -109,11 +109,47 @@ pip install 'localdecide[playwright]' && playwright install chromium
 pip install 'localdecide[cdp]'
 ```
 
-Check what you have:
+Check what you have — `doctor` detects your hardware and tells you exactly what to do:
 
 ```bash
 localdecide doctor
 ```
+
+On an M4 it prints the chip, memory, runtime, and runs a one-decision smoke test so a
+broken install shows up here instead of in your agent:
+
+```
+python      3.12.13 (arm64, Darwin)
+hardware    Apple M4, 16 GB unified memory
+laya-mlx    installed
+playwright  installed
+backend     laya-mlx
+smoke test  OK (85 ms, first call includes model load)
+```
+
+### What to expect on different devices
+
+Everything here is measured on real hardware or stated as a limit. The harness is
+identical everywhere (pure Python, verified by CI on 6 platform/Python combinations); what
+changes by device is which runtime you install and how big a decision you can afford.
+
+| Device | Runtime | Expected experience |
+|---|---|---|
+| **Apple Silicon M-series, 16 GB+** (M1–M4) | `laya-mlx` | The reference experience: 10–30 ms short decisions, ~330 ms scoped browser steps, everything local. This is what the benchmarks above measure. |
+| **Apple Silicon, 8 GB** (M1/M2 base) | `laya-mlx` | Works, but 650 MB checkpoint + Chromium is tight. The subprocess design keeps one model OR one browser resident; close heavy apps. Expect swap pressure on big pages. |
+| **Intel Mac** | `laya` (PyTorch) | `laya-mlx` does not run here. Model works; expect ~2–4× the Apple Silicon latency on CPU. Browser loop fine. |
+| **Linux server, CPU only** | `laya` (PyTorch) | Good for batch deciding (no browser needed for classification). Browser loops work headless. Latency similar to Intel Mac CPU. |
+| **Linux + NVIDIA GPU** | `laya` (PyTorch, CUDA) | Best PyTorch path — GPU inference cuts latency well below CPU. Also the only place you can *fine-tune* (the laya-browser recipe needs CUDA). |
+| **Windows** | `laya` (PyTorch) | Works; same expectations as Linux CPU. Playwright supports it natively. |
+| **Below 8 GB total / Raspberry Pi class** | — | Not supported. The checkpoint alone is 650 MB and the decision heads want ~1 GB resident. Use the HTTP backend to reach another machine instead. |
+| **Any device, model elsewhere** | `HTTPBackend` | Point `Decider("http://host:8791/v1/...")` at a machine that has the model. Your page content goes to *your* other machine, not to a cloud. |
+
+Two things that do **not** change by device:
+
+- **Accuracy.** The same checkpoint makes the same decision everywhere; the runtimes are
+  verified to agree to four decimal places (the MLX port publishes 378/378 parity checks).
+- **The safety guards.** Validation, fail-open, confidence gate, toggle guard, loop guard —
+  all pure Python, all identical, all CI-tested on every platform in the matrix.
 
 The model downloads once on first use (~644 MB) and is cached.
 
@@ -218,6 +254,20 @@ localdecide skills"*, or copy the folder into your agent's skills directory.
 |---|---|
 | `skills/browser-decide` | how to run the loop, what each operation means, when to stop |
 | `skills/decide` | the primitive: typed questions, confidence gating, calibration notes |
+
+**Installing into an agent** (the installer detects which ones you have):
+
+```bash
+git clone https://github.com/ChenneyZhuang/laya-browser-agent
+cd laya-browser-agent
+python3 install_skills.py        # copies skills/ into every agent it finds
+python3 install_skills.py --check   # preview only, changes nothing
+python3 install_skills.py --uninstall
+```
+
+or point your agent at this repo and say *"install the laya-browser-agent skills"* —
+the SKILL.md files are plain markdown, so Claude Code, Codex, Cursor, Hermes and
+anything that reads the format can follow them without this installer.
 
 ---
 

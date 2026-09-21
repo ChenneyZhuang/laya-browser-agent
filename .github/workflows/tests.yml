@@ -4,32 +4,62 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 jobs:
+  # The fast suite: harness rules with fake backends. Runs on every push, on every
+  # platform users actually have, in seconds, without downloading any checkpoint.
+  # The matrix is the "simulate below-M4 and everything else" answer: x86 Linux,
+  # Windows, Intel macOS and Apple Silicon all run the same pure-Python harness, which
+  # is exactly the code that must behave identically everywhere. Oldest and newest
+  # Python are both covered because 3.9 vs 3.13 differ in ways that matter (typing,
+  # importlib, dataclass behaviour).
   contract:
-    runs-on: macos-14
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04        # x86_64 Linux server
+            python: "3.9"           # oldest supported
+          - os: ubuntu-24.04        # x86_64 Linux
+            python: "3.13"          # newest supported
+          - os: windows-2022        # Windows x86_64
+            python: "3.11"
+          - os: macos-13            # Intel Mac (x86_64)
+            python: "3.11"
+          - os: macos-14            # Apple Silicon (M1)
+            python: "3.12"
+          - os: macos-15            # Apple Silicon (newer M-series)
+            python: "3.13"
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
-      - name: Install
+          python-version: ${{ matrix.python }}
+      - name: Install (no model extras - the harness must not need one)
         run: |
           python -m pip install --upgrade pip
           pip install -e . pytest
-      - name: Contract tests (no model needed)
-        # The fast suite: harness rules only, fakes instead of checkpoints. Runs everywhere,
-        # finishes in seconds, and is what guards every refactor.
-        run: python -m pytest tests/test_contract.py -q
+      - name: Prove no model runtime is present or required
+        run: |
+          import importlib.util as u
+          present = u.find_spec("laya_mlx") is not None or u.find_spec("laya") is not None
+          assert not present, "test leak: model extras installed"
+        shell: python
+      - name: Contract tests
+        run: python -m pytest tests/test_contract.py -q -p no:cacheprovider
       - name: Memory-safety rules
-        run: python -m pytest tests/test_live.py::TestMemorySafety -q
+        run: python -m pytest tests/test_live.py::TestMemorySafety -q -p no:cacheprovider
 
-  live:
-    # The live suite needs a model and a browser. GitHub's macOS runners have neither the
-    # memory headroom nor the checkpoint cached, so this is opt-in: run it locally with
-    # scripts/run_live_batched.sh, or on a self-hosted runner by setting ENABLE_LIVE.
+  # A real checkpoint on a real Apple Silicon runner - the closest CI gets to the
+  # development machine. Opt-in (workflow_dispatch) on purpose: the checkpoint is ~650 MB,
+  # the runner has 7 GB, and that is enough for exactly one model OR one browser at a
+  # time - which is why the live suite here still goes through the subprocess path and
+  # the memory-checked batch script rather than one big pytest run.
+  apple-silicon-live:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: macos-14
-    if: github.event_name == 'workflow_dispatch' || vars.ENABLE_LIVE == '1'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -38,7 +68,7 @@ jobs:
       - name: Install with model + browser
         run: |
           python -m pip install --upgrade pip
-          pip install -e '.[all]' pytest
+          pip install -e '.[mlx,playwright,cdp]' pytest
           playwright install chromium
       - name: Live tests (batched, memory-checked)
         run: ./scripts/run_live_batched.sh

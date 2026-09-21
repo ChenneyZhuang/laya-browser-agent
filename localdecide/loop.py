@@ -146,7 +146,14 @@ class BrowserDecider:
         scope: Optional[Scope] = None,
         min_confidence: float = 0.15,
     ) -> None:
-        self.decider = decider or Decider()
+        # The decider is created lazily on first use. Constructing a BrowserDecider is
+        # something you do while wiring an agent together - inspecting attributes, testing
+        # guard logic - and none of that should require a checkpoint to be installed. The
+        # model loads the moment a real decision is asked for, and not before.
+        self._decider = decider
+        self._decider_args: tuple = ()
+        if decider is None:
+            self._decider_args = (Decider,)
         self.max_steps = max_steps
         # TYPE_TEXT needs a string; a decision model cannot write one. Supply a callback
         # (a small LLM, a regex over the goal, a lookup table) or TYPE_TEXT is refused.
@@ -161,6 +168,13 @@ class BrowserDecider:
         # confidence. Acting on a near-coin-flip is worse than not acting, so anything under
         # this bar is refused. Set 0.0 to disable, or raise it in high-stakes flows.
         self.min_confidence = min_confidence
+
+    @property
+    def decider(self) -> Decider:
+        """The decision layer, created on first touch. May be any Decider-like object."""
+        if self._decider is None:
+            self._decider = self._decider_args[0]()
+        return self._decider
 
     def run(self, driver: Driver, goal: str) -> Run:
         run = Run(goal=goal)
