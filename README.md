@@ -1,6 +1,6 @@
-# localdecide
+# laya-browser-agent
 
-**Browser decisions from a local, open-weight System 1 model — no cloud, no API key, no screenshots.**
+**Browser agent decisions powered by Laya — the open-source System 1 model. A local alternative to TypeSafe Jev: no cloud, no API key, no screenshots.** — no cloud, no API key, no screenshots.**
 
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 ![Python](https://img.shields.io/badge/python-3.9%2B-blue)
@@ -172,7 +172,24 @@ with PlaywrightDriver(headless=False) as driver:
 the chrome filter, whatever it looks like — because "Random article" is a navigation link
 *and* the thing the user asked for. See [Two failure modes](#two-failure-modes-worth-knowing-before-you-file-a-bug).
 
-### 3. As a service other agents point at
+### 3. As an MCP server for Claude Desktop, Cursor, and friends
+
+```bash
+pip install 'localdecide[mlx]'   # or [torch]
+localdecide-mcp
+```
+
+Register once and the agent gets two tools — `decide` (typed questions about anything)
+and `page_decide` (page observation + goal → chosen element):
+
+```json
+{ "mcpServers": { "localdecide": { "command": "/path/to/localdecide-mcp" } } }
+```
+
+Zero SDK dependency on either side: the server speaks MCP over stdio with nothing but
+stdlib JSON, so it runs anywhere the package installs.
+
+### 4. As a service other agents point at
 
 ```bash
 localdecide serve --port 8791
@@ -191,7 +208,7 @@ for example [`browser-use/jev-ultrafast`](https://github.com/browser-use/jev-ult
 after applying its local-endpoint patch, or any agent that talks to a
 TypeSafe-compatible gateway.
 
-### 4. As an agent skill
+### 5. As an agent skill
 
 `skills/` holds plain `SKILL.md` files — the portable format Claude Code, Codex,
 Cursor, and Hermes read. Point your agent at this repo and say *"install the
@@ -480,6 +497,7 @@ localdecide/
   drivers.py       Playwright and CDP drivers
   serve.py         the HTTP dialects (/v1/systemone, /v1/decide, /v1/table)
   cli.py           localdecide doctor|decide|table|serve
+  mcp_server.py    MCP over stdio for Claude Desktop / Cursor
   backends/        MLX, PyTorch, and HTTP backends behind one protocol
 skills/            portable SKILL.md files for agent harnesses
 tests/             39 tests covering the contract (no model needed)
@@ -490,7 +508,7 @@ examples/diagnostics/   the measurement scripts behind the benchmark tables
 ## Development
 
 ```bash
-git clone https://github.com/ChenneyZhuang/localdecide
+git clone https://github.com/ChenneyZhuang/laya-browser-agent
 cd localdecide
 python3.12 -m venv .venv && .venv/bin/pip install -e '.[all]' pytest
 .venv/bin/python -m pytest tests/test_contract.py -q   # 48 tests, instant, no model needed

@@ -1,0 +1,44 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  contract:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e . pytest
+      - name: Contract tests (no model needed)
+        # The fast suite: harness rules only, fakes instead of checkpoints. Runs everywhere,
+        # finishes in seconds, and is what guards every refactor.
+        run: python -m pytest tests/test_contract.py -q
+      - name: Memory-safety rules
+        run: python -m pytest tests/test_live.py::TestMemorySafety -q
+
+  live:
+    # The live suite needs a model and a browser. GitHub's macOS runners have neither the
+    # memory headroom nor the checkpoint cached, so this is opt-in: run it locally with
+    # scripts/run_live_batched.sh, or on a self-hosted runner by setting ENABLE_LIVE.
+    runs-on: macos-14
+    if: github.event_name == 'workflow_dispatch' || vars.ENABLE_LIVE == '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install with model + browser
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e '.[all]' pytest
+          playwright install chromium
+      - name: Live tests (batched, memory-checked)
+        run: ./scripts/run_live_batched.sh

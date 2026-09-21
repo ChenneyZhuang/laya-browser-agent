@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "localdecide"
 version = "0.1.0"
-description = "Browser decisions from a local, open-weight System 1 model — no cloud, no API key, no screenshots."
+description = "Browser agent decisions with Laya, the open System 1 model — a local, open-source alternative to TypeSafe Jev. No cloud, no API key, no screenshots."
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "Apache-2.0" }
@@ -34,11 +34,12 @@ cdp = ["websocket-client>=1.6"]
 all = ["laya-mlx>=0.1.0", "playwright>=1.40", "websocket-client>=1.6"]
 
 [project.urls]
-Homepage = "https://github.com/ChenneyZhuang/localdecide"
-Issues = "https://github.com/ChenneyZhuang/localdecide/issues"
+Homepage = "https://github.com/ChenneyZhuang/laya-browser-agent"
+Issues = "https://github.com/ChenneyZhuang/laya-browser-agent/issues"
 
 [project.scripts]
 localdecide = "localdecide.cli:main"
+localdecide-mcp = "localdecide.mcp_server:serve"
 
 [tool.setuptools]
 packages = ["localdecide", "localdecide.backends"]
