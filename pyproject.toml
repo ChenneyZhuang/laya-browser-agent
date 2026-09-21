@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "localdecide"
+version = "0.1.0"
+description = "Browser decisions from a local, open-weight System 1 model — no cloud, no API key, no screenshots."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Chenney Zhuang" }]
+keywords = ["browser-agent", "system-one", "decision-model", "laya", "local-first", "agent", "mcp", "playwright", "cdp"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Topic :: Internet :: WWW/HTTP :: Browsers",
+]
+dependencies = []
+
+[project.optional-dependencies]
+# Apple Silicon: fastest path, ~10-30 ms per decision on an M-series chip.
+mlx = ["laya-mlx>=0.1.0"]
+# Everywhere else: the same checkpoints through PyTorch.
+torch = ["laya>=0.3.3"]
+# Real browser control.
+playwright = ["playwright>=1.40"]
+# Attach to a Chrome you already have open and logged in.
+cdp = ["websocket-client>=1.6"]
+# Everything a desktop user needs on a Mac.
+all = ["laya-mlx>=0.1.0", "playwright>=1.40", "websocket-client>=1.6"]
+
+[project.urls]
+Homepage = "https://github.com/ChenneyZhuang/localdecide"
+Issues = "https://github.com/ChenneyZhuang/localdecide/issues"
+
+[project.scripts]
+localdecide = "localdecide.cli:main"
+
+[tool.setuptools]
+packages = ["localdecide", "localdecide.backends"]
+
+[tool.setuptools.package-data]
+localdecide = ["py.typed"]
