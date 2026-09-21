@@ -116,6 +116,11 @@ class Scope:
     max_label_chars: int = 60
     # If True (default), an element matching the goal is never removed by drop_chrome.
     protect_goal_matches: bool = True
+    # When the goal is written in a non-Latin script, restrict the offered elements to
+    # the ones whose labels share that script. Measured: the browser checkpoint cannot
+    # bridge scripts (a Chinese goal picked a Hindi button at p=0.06), and reordering is
+    # not enough - the distractors have to leave the option list. Latin goals are unaffected.
+    ground_non_latin: bool = True
 
     # -- pattern helpers ------------------------------------------------------
 
@@ -173,11 +178,49 @@ class Scope:
         """Return a copy of the observation with a scoped action list.
 
         Pass the goal whenever you have one: it protects a legitimate target from being
-        mistaken for chrome, and it puts the elements you probably want at the top.
+        mistaken for chrome, it puts the elements you probably want at the top, and it
+        lets cross-language grounding shortlist elements whose labels are written in the
+        goal's own script (see `grounding.ground_goal`).
         """
+        from .grounding import ground_goal
+
         actions = list(observation.get("actions", []) or [])
         tokens = goal_tokens(goal) if goal else []
         kept = [action for action in actions if self.keep(action, tokens)]
+
+        # Cross-language grounding. Measured twice on the browser checkpoint:
+        #   * reordering same-script candidates first changes nothing (1/9 -> 1/9);
+        #   * what works is removing the other-script distractors entirely - the model
+        #     cannot bridge scripts, and a Latin or Devanagari label in the option list
+        #     actively pulls the answer away from the goal's script.
+        # Only applied to non-Latin goals, where the script signal is reliable. Latin is
+        # left alone: English goals work fine and the fallback risk is not worth it.
+        grounding: Dict[str, Any] = {}
+        if goal and self.ground_non_latin:
+            grounding = ground_goal(goal, kept)
+            script = grounding.get("script", "")
+            candidates = grounding.get("candidates", [])
+            if script and script != "latin" and candidates:
+                # Score the kept actions directly instead of trusting their `index` fields:
+                # raw observations frequently omit indices, and a filter keyed on a missing
+                # value silently keeps everything - the exact failure the tests caught.
+                from .grounding import overlap_score
+
+                goal_script = script
+                def _same_script(action: Mapping[str, Any]) -> bool:
+                    from .grounding import same_script
+                    return same_script(goal, str(action.get("label", "") or ""))
+
+                filtered = [action for action in kept
+                            if _same_script(action) or overlap_score(goal, str(action.get("label", "") or "")) > 0]
+                # Never filter everything out - a wrong-but-usable list beats an empty one.
+                if filtered:
+                    kept = filtered
+            elif script == "latin":
+                # Latin goals work without grounding; drop the report so callers can tell
+                # the difference between "no grounding needed" and "grounding found nothing".
+                grounding = {}
+
         ranked = self.rank(kept, tokens)[: self.max_elements]
         # Renumber so the indices the model sees are dense and start at 1.
         renumbered = [{**action, "index": index} for index, action in enumerate(ranked, start=1)]
@@ -190,6 +233,11 @@ class Scope:
             "goal_protected": sum(1 for action in ranked
                                   if tokens and self._matches_goal(str(action.get("label", "")), tokens)),
         }
+        if grounding:
+            scoped["scope"]["script"] = grounding.get("script", "")
+            scoped["scope"]["grounded"] = len(grounding.get("candidates", []))
+            if grounding.get("diagnosis"):
+                scoped["scope"]["diagnosis"] = grounding["diagnosis"]
         return scoped
 
 

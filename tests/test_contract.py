@@ -643,5 +643,86 @@ class TestConfidenceGate(unittest.TestCase):
         self.assertEqual(driver2.executed, [("CLICK", "1", None)], "a low threshold must allow it")
 
 
+
+
+class TestGrounding(unittest.TestCase):
+    """Cross-language grounding: non-Latin goals must not be answered with foreign labels.
+
+    Measured on the real checkpoint: a Chinese goal offered a page of mixed-script labels
+    picked a Hindi button at p=0.06 (no signal). Filtering the option list down to labels
+    sharing the goal's script turned 1/9 correct into 8/9 across ten scripts. These tests
+    cover the unit pieces; the end-to-end numbers live in the repo README.
+    """
+
+    def observation(self):
+        return {"url": "https://x", "title": "T", "text": "", "actions": [
+            {"kind": "click", "node": "n1", "label": "登录", "role": "button"},
+            {"kind": "click", "node": "n2", "label": "加入购物车", "role": "button"},
+            {"kind": "click", "node": "n3", "label": "Giriş yap", "role": "button"},
+            {"kind": "click", "node": "n4", "label": "Log in", "role": "button"},
+            {"kind": "fill", "node": "n5", "label": "搜索商品", "role": "searchbox"},
+        ]}
+
+    def test_script_detection(self):
+        from localdecide import script_of
+        self.assertEqual(script_of("登录"), "han")
+        self.assertEqual(script_of("カートに追加"), "kana")
+        self.assertEqual(script_of("로그인"), "hangul")
+        self.assertEqual(script_of("Войти"), "cyrillic")
+        self.assertEqual(script_of("تسجيل الدخول"), "arabic")
+        self.assertEqual(script_of("เข้าสู่ระบบ"), "thai")
+        self.assertEqual(script_of("Σύνδεση"), "greek")
+        self.assertEqual(script_of("Log in"), "latin")
+        self.assertEqual(script_of("12345"), "")  # digits only
+
+    def test_japanese_and_chinese_share_a_family(self):
+        from localdecide import same_script
+        self.assertTrue(same_script("カートに追加", "登录"))   # kana + han are one family
+        self.assertTrue(same_script("登录", "加入购物车"))
+        self.assertFalse(same_script("登录", "Log in"))
+
+    def test_overlap_finds_the_target(self):
+        from localdecide import ground_goal
+        result = ground_goal("点击“加入购物车”按钮。", self.observation()["actions"])
+        self.assertEqual(result["script"], "han")
+        self.assertTrue(result["candidates"])
+        best = result["candidates"][0]
+        self.assertEqual(best, "2", f"expected the 加入购物车 button first; got {result['scores']}")
+
+    def test_grounding_filters_other_scripts(self):
+        scope = Scope(max_elements=10)
+        scoped = scope.apply(self.observation(), goal="点击“登录”按钮。")
+        labels = [action["label"] for action in scoped["actions"]]
+        self.assertIn("登录", labels)
+        self.assertNotIn("Log in", labels)
+        self.assertNotIn("Giriş yap", labels)
+        self.assertEqual(scoped["scope"]["script"], "han")
+
+    def test_latin_goals_are_not_filtered(self):
+        """English works fine as-is; grounding must not disturb it."""
+        scope = Scope(max_elements=10)
+        scoped = scope.apply(self.observation(), goal="Click the 'Log in' button.")
+        labels = [action["label"] for action in scoped["actions"]]
+        self.assertIn("Log in", labels)
+        self.assertIn("登录", labels)  # not filtered: Latin goals keep the whole list
+        self.assertNotIn("script", scoped["scope"])  # no grounding report for Latin
+
+    def test_no_diagnosis_when_the_script_is_missing(self):
+        """A goal whose script matches nothing must say so, not silently return junk."""
+        scope = Scope(max_elements=10)
+        scoped = scope.apply(self.observation(), goal="Нажмите кнопку «Войти».")  # Cyrillic
+        report = scoped["scope"]
+        self.assertIn("diagnosis", report, "should explain why nothing matched")
+        self.assertIn("script", report)
+
+    def test_grounding_never_empties_the_list(self):
+        """A wrong-but-usable option list beats an empty one."""
+        scope = Scope(max_elements=10)
+        scoped = scope.apply({"url": "u", "title": "t", "text": "", "actions": [
+            {"kind": "click", "node": "n1", "label": "Log in", "role": "button"},
+        ]}, goal="点击“登录”按钮。")
+        self.assertTrue(scoped["actions"], "grounding must never filter everything out")
+
+
 if __name__ == "__main__":
     unittest.main()

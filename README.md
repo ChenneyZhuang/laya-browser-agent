@@ -2,6 +2,17 @@
 
 **Browser decisions from a local, open-weight System 1 model — no cloud, no API key, no screenshots.**
 
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+![Python](https://img.shields.io/badge/python-3.9%2B-blue)
+![Runs on](https://img.shields.io/badge/runs%20on-Apple%20Silicon%20%7C%20CUDA%20%7C%20CPU-black)
+
+A local, open-weight alternative to [TypeSafe Jev](https://docs.typesafe.ai) for the
+browser-driving use case — running [Laya](https://github.com/NandhaKishorM/laya), the
+open-source "System One" decision model, fully on your own machine. Works with
+[browser-use/jev-ultrafast](https://github.com/browser-use/jev-ultrafast) via the same
+wire format, and speaks TypeSafe's `/v1/systemone` dialect, so existing Jev tooling
+points at it by changing one base URL.
+
 A decision model answers typed questions about a state and returns calibrated
 probabilities. It never writes text, so it cannot hallucinate an instruction. That
 makes it exactly the right shape for the *deciding* half of a browser agent: hand it
@@ -32,6 +43,24 @@ Measured on an M4 MacBook Air, 16 GB (see [Benchmarks](#benchmarks)):
 | Page content sent to a server | **none** |
 
 ---
+
+## How this relates to Jev and Laya
+
+| | [TypeSafe Jev](https://docs.typesafe.ai) | [Laya](https://github.com/NandhaKishorM/laya) | **localdecide** |
+|---|---|---|---|
+| Weights | closed, API only | open, Apache-2.0 | runs Laya's open weights |
+| Where it runs | TypeSafe's cloud | anywhere PyTorch runs | **your machine** — MLX on Apple Silicon, PyTorch elsewhere |
+| Wire format | `POST /v1/systemone` | same contract | speaks it too (`POST /v1/systemone`) |
+| Cost | $0.042/M input tokens | free | free |
+| Browser harness | [jev-ultrafast](https://github.com/browser-use/jev-ultrafast) (12.6k★) | — | **included**: loop, drivers, guards, skills |
+| Page leaves your machine | yes | no | **no** |
+
+If you have read about Jev's "System One" model and want the same idea — typed,
+calibrated decisions instead of generated text — running locally for your browser
+agents, this is the wiring for it. It uses the browser-tuned Laya checkpoint
+(`cklxx/laya-browser`, which itself documents 0% → 62% task success after fine-tuning)
+and adds the parts neither project ships: element-table observation, answer validation,
+confidence gating, loop guards, and a TypeSafe-compatible server.
 
 ## Why this exists
 
@@ -312,6 +341,33 @@ and the failure is indistinguishable from a model error. Therefore scoping here 
 **goal-aware**: an element whose label overlaps the goal is never dropped, whatever else
 it looks like. Ten tests cover this (`TestScope`), including the one that caught a
 quote-handling bug (`'random` / `article'`) that silently disabled the protection.
+
+### Multilingual pages: a grounding layer, not a bigger model
+
+Tested against labels in Chinese, Japanese, Korean, Arabic, Russian, Greek, Thai, Hindi,
+Vietnamese and Turkish, the browser-tuned checkpoint **cannot bridge scripts**: a Chinese
+goal picked a Hindi button (p≈0.06, i.e. no signal at all), and the multilingual base
+checkpoint returned nothing usable. Only goals whose own characters appear in a label
+worked.
+
+The fix is not a different model — it is letting code do what code is good at. Before the
+decision, `Scope` detects the goal's script, scores every label for overlap, and (for
+non-Latin goals) **removes the other-script distractors from the option list entirely**:
+
+| | offered | correct |
+|---|---|---|
+| without grounding | 25 mixed-script labels | 1/9 |
+| with script grounding | 1-10 same-script labels | **5-8/9** |
+
+Reordering alone did nothing (measured 1/9 → 1/9); removing the distractors is what
+worked. The remaining misses are honest and instructive: on a page mixing Chinese and
+Japanese labels, both scripts are Han-family, so a Japanese distractor survives the filter
+and can still pull the answer (measured: `カートに追加` beating the intended `加入购物车`).
+Per-script precision beyond "same script" needs the model to understand the language —
+that is a fine-tuning job, and this harness now makes its failure *visible* instead of
+silent. Latin-script goals are untouched — they work fine and the fallback risk is not
+worth it. A goal whose script matches no label gets an explicit diagnosis; translating
+that goal is your job, and now you know you need to.
 
 ### Three things the model gets wrong, and what the harness does about it
 

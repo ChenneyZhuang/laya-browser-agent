@@ -30,10 +30,10 @@ from .page import (
     build_element_table,
     table_to_questions,
 )
+from .grounding import ground_goal, overlap_score, same_script, script_of
 from .scope import Scope, full_page_scope, goal_tokens
 
 __version__ = "0.1.0"
-
 __all__ = [
     # deciding
     "Decider", "Decision", "DecisionError", "Answers", "Question", "choice", "score", "noul",
@@ -43,5 +43,7 @@ __all__ = [
     "ElementTable", "Element", "build_element_table", "table_to_questions", "OPERATIONS",
     # observation scoping
     "Scope", "full_page_scope",
+    # cross-language grounding
+    "ground_goal", "overlap_score", "same_script", "script_of",
     "__version__",
 ]
