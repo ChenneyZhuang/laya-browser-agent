@@ -613,8 +613,10 @@ one is runnable, and each answers a specific question:
 | `scope_effect.py` | what scoping actually buys |
 | `instruction_ablation.py` | does instruction wording change the answer (mostly no) |
 | `state_ablation.py` | does page text change the answer (yes, a lot) |
+| `position_bias.py` | is the answer position-dependent (English: no; CJK: unstable) |
+| `multilingual_accuracy.py` | per-script accuracy on both checkpoints (raw numbers) |
+| `grounding_effect.py` | the grounding filter's before/after on the same cases |
 | `text_priming.py` | which specific words in the page text cause the wrong answer |
-| `type_text_bias.py` | why a search flow submits before filling the field |
 | `checkbox_probe.py` | the checkbox-undoing behaviour, in isolation |
 | `check_hidden.py` | hidden elements are excluded from the observation |
 
