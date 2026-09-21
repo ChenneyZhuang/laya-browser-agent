@@ -2,7 +2,9 @@
 
 **Browser agent decisions powered by Laya — the open-source System 1 model. A local alternative to TypeSafe Jev: no cloud, no API key, no screenshots.** — no cloud, no API key, no screenshots.**
 
+[![tests](https://github.com/ChenneyZhuang/laya-browser-agent/actions/workflows/tests.yml/badge.svg)](https://github.com/ChenneyZhuang/laya-browser-agent/actions/workflows/tests.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+![GitHub release](https://img.shields.io/github/v/tag/ChenneyZhuang/laya-browser-agent)
 ![Python](https://img.shields.io/badge/python-3.9%2B-blue)
 ![Runs on](https://img.shields.io/badge/runs%20on-Apple%20Silicon%20%7C%20CUDA%20%7C%20CPU-black)
 
@@ -218,12 +220,22 @@ localdecide-mcp
 Register once and the agent gets two tools — `decide` (typed questions about anything)
 and `page_decide` (page observation + goal → chosen element):
 
-```json
-{ "mcpServers": { "localdecide": { "command": "/path/to/localdecide-mcp" } } }
+Per client:
+
+```jsonc
+// Claude Desktop — claude_desktop_config.json (macOS: ~/Library/Application Support/Claude/)
+{ "mcpServers": { "localdecide": { "command": "/opt/homebrew/bin/localdecide-mcp" } } }
+
+// Cursor — ~/.cursor/mcp.json (same shape)
+{ "mcpServers": { "localdecide": { "command": "localdecide-mcp" } } }
+
+// Hermes — config.yaml
+// mcp_servers: [ { name: localdecide, command: localdecide-mcp, args: [] } ]
 ```
 
-Zero SDK dependency on either side: the server speaks MCP over stdio with nothing but
-stdlib JSON, so it runs anywhere the package installs.
+Find the real path with `which localdecide-mcp`. Zero SDK dependency on either side: the
+server speaks MCP over stdio with nothing but stdlib JSON, so it runs anywhere the
+package installs. Tools appear in your agent as `decide` and `page_decide`.
 
 ### 4. As a service other agents point at
 
@@ -619,6 +631,49 @@ one is runnable, and each answers a specific question:
 | `text_priming.py` | which specific words in the page text cause the wrong answer |
 | `checkbox_probe.py` | the checkbox-undoing behaviour, in isolation |
 | `check_hidden.py` | hidden elements are excluded from the observation |
+
+## Troubleshooting
+
+**`localdecide doctor` says "No local decision runtime yet"**
+Install the extras for your platform: `pip install 'localdecide[mlx]'` on Apple Silicon,
+`pip install 'localdecide[torch]'` everywhere else. Then run doctor again — it now runs a
+one-decision smoke test, so "OK" means the checkpoint loaded and answered.
+
+**First decision is slow (~10 s)**
+The checkpoint downloads on first use (~650 MB) and loads once per process. Later
+decisions are milliseconds. Pre-warm by running `localdecide doctor` after install.
+
+**The model picks the wrong element**
+Look at what it was offered before tuning anything. Diagnose with:
+
+```bash
+localdecide table --observation page.json --goal '...' --verbose
+```
+
+Common causes, in order of frequency: too many options (scope to ~20), page text priming
+(see [Three things](#three-things-the-model-gets-wrong-and-what-the-harness-does-about-it)),
+or a goal phrased in a different language from the labels (see [Multilingual](#multilingual-pages-a-grounding-layer-not-a-bigger-model)).
+
+**My run errored with "model is not confident enough to act"**
+The confidence gate refused twice — that is the harness protecting you from a near-coin-flip
+action. Either the page is genuinely ambiguous (narrow the observation), or your goal does
+not match what is on the page.
+
+**Playwright raises "It looks like you are using Playwright Sync API inside the asyncio loop"**
+The model runtime created an event loop. Do not mix them in one process — run browser work
+in a subprocess (see `tests/_browser_child.py` for the pattern). On a 16 GB machine this is
+not optional: the two together can exhaust memory and hard-reboot an Apple Silicon Mac.
+
+**Windows: `UnicodeDecodeError` reading files**
+Always pass `encoding="utf-8"` when your code reads this repo's text. (This bit our own CI;
+the fix is applied everywhere in-repo.)
+
+**Chinese/Japanese goals pick the wrong control**
+Script grounding filters to same-script labels automatically. Remaining misses come from
+Han-family overlap (Japanese labels on a Chinese page) — disambiguate the goal, or fine-tune
+on your domain.
+
+---
 
 ## License
 
