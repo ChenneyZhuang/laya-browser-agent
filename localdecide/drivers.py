@@ -144,6 +144,19 @@ class PlaywrightDriver(_BaseDriver):
         except ImportError as exc:  # pragma: no cover
             raise RuntimeError("playwright is not installed: pip install playwright && playwright install chromium") from exc
         self.settle_ms = settle_ms
+        # Playwright's sync API binds to the event loop that is current *at start()* time,
+        # and close() closes that loop. A second driver created later in the same process
+        # then finds "Event loop is closed!" - which is what happened when the real-website
+        # battery created several drivers in a row. The fix is a fresh loop per driver,
+        # started explicitly and restored after, so each driver owns its loop lifecycle.
+        import asyncio
+
+        try:
+            self._previous_loop = asyncio.get_event_loop()
+        except RuntimeError:
+            self._previous_loop = None
+        self._loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self._loop)
         self._pw = sync_playwright().start()
         launch: Dict[str, Any] = {"headless": headless}
         if user_data_dir:
@@ -271,6 +284,14 @@ class PlaywrightDriver(_BaseDriver):
         return str(current) == str(value)
 
     def close(self) -> None:
+        # Idempotent: the loop is closed on the first call, and a second close must be a
+        # no-op rather than an exception. The real-website battery hit this because both
+        # BrowserDecider.run()'s finally block and the caller's finally block closed the
+        # same driver, and the second close crashed on the already-closed loop - turning
+        # a completed run into a spurious DRIVER ERROR.
+        if getattr(self, "_closed", False):
+            return
+        self._closed = True
         try:
             if getattr(self, "_context", None) is not None:
                 self._context.close()
@@ -278,6 +299,10 @@ class PlaywrightDriver(_BaseDriver):
                 self._browser.close()
         finally:
             self._pw.stop()
+            # Restore the caller's event loop so a subsequent driver (or any asyncio
+            # work in the same process) starts clean instead of finding a closed loop.
+            import asyncio
+            asyncio.set_event_loop(self._previous_loop)
 
 
 class _PointHandle:
@@ -387,6 +412,9 @@ class CDPDriver(_BaseDriver):
         return x, y
 
     def close(self) -> None:
+        if getattr(self, "_closed", False):
+            return
+        self._closed = True
         try:
             self._ws.close()
         except Exception:
