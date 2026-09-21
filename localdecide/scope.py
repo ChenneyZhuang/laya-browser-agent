@@ -201,21 +201,26 @@ class Scope:
             script = grounding.get("script", "")
             candidates = grounding.get("candidates", [])
             if script and script != "latin" and candidates:
-                # Score the kept actions directly instead of trusting their `index` fields:
-                # raw observations frequently omit indices, and a filter keyed on a missing
-                # value silently keeps everything - the exact failure the tests caught.
-                from .grounding import overlap_score
-
-                goal_script = script
-                def _same_script(action: Mapping[str, Any]) -> bool:
-                    from .grounding import same_script
-                    return same_script(goal, str(action.get("label", "") or ""))
-
-                filtered = [action for action in kept
-                            if _same_script(action) or overlap_score(goal, str(action.get("label", "") or "")) > 0]
+                # Strict candidate filtering: keep only what the shortlist names, mapping
+                # through the scores' own indices (ground_goal assigns positional indices
+                # to actions that lack one, so this works whether or not the observation
+                # carried explicit indices). An earlier version kept everything of the same
+                # script family instead — that let a Japanese label survive a Chinese goal's
+                # filter and pull the answer (measured 8/9 -> 5/9 on mixed Han pages), which
+                # is exactly the regression this strict form prevents.
+                keep_indices = set(candidates)
+                filtered = []
+                for position, action in enumerate(kept, start=1):
+                    index = str(action.get("index") or position)
+                    if index in keep_indices:
+                        filtered.append({**action, "index": index})
                 # Never filter everything out - a wrong-but-usable list beats an empty one.
                 if filtered:
                     kept = filtered
+                # Keep only the strong candidates in the report so "grounded" counts what
+                # actually survived, not what was scored.
+                grounding = {**grounding, "candidates": sorted(
+                    keep_indices, key=lambda index: candidates.index(index))}
             elif script == "latin":
                 # Latin goals work without grounding; drop the report so callers can tell
                 # the difference between "no grounding needed" and "grounding found nothing".
