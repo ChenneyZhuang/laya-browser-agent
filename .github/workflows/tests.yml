@@ -20,7 +20,7 @@ jobs:
       matrix:
         include:
           - os: ubuntu-22.04        # x86_64 Linux server
-            python: "3.9"           # oldest supported
+            python: "3.10"          # oldest supported (laya PyPI dep requires >=3.10)
           - os: ubuntu-24.04        # x86_64 Linux
             python: "3.13"          # newest supported
           - os: windows-2022        # Windows x86_64
