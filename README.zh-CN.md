@@ -26,6 +26,8 @@
 
 ## 安装
 
+> **安装提示**：PyPI 版本正在跟进仓库。当前请用 `git clone https://github.com/ChenneyZhuang/laya-browser-agent && cd laya-browser-agent && pip install -e '.[all]'` 安装（Apple Silicon 用 `[all]`，其他平台用 `[torch]`）。
+
 ```bash
 # Apple Silicon（MLX，最快路径）
 pip install 'laya-browser-agent[mlx]'

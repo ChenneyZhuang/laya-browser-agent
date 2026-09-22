@@ -206,18 +206,26 @@ into a table your code built.
 
 ### Step by step
 
-**1. Install the package with the extras for your platform:**
+**1. Install the package with the extras for your platform.** Install from a
+git clone (the PyPI release is catching up to the repo; if `pip install
+laya-browser-agent` works for you, prefer it):
 
 ```bash
+git clone https://github.com/ChenneyZhuang/laya-browser-agent && cd laya-browser-agent
+
 # Apple Silicon Mac (M1–M4) — MLX runtime, fastest path:
-pip install 'laya-browser-agent[mlx]'
+pip install -e '.[all]'
 
 # Linux / Windows / Intel Mac — same checkpoints through PyTorch:
-pip install 'laya-browser-agent[torch]'
+pip install -e '.[torch]'
 
-# Linux + NVIDIA GPU — PyTorch with CUDA (torch will pick the CUDA wheel if present):
-pip install 'laya-browser-agent[torch]'
+# Linux + NVIDIA GPU — PyTorch will pick the CUDA wheel if one is present:
+pip install -e '.[torch]'
 ```
+
+(Once the package is on PyPI, `pip install 'laya-browser-agent[mlx]'` /
+`[torch]` will be the one-liner. `localdecide` is the import and CLI name on
+both paths.)
 
 **2. Install a browser driver (only needed for the browser loop):**
 

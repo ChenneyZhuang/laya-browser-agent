@@ -23,6 +23,8 @@ Un modelo de decisión responde preguntas tipadas sobre un estado y devuelve **p
 
 ## Instalación
 
+> **Nota de instalación**: la versión en PyPI está alcanzando al repo. Por ahora usa `git clone https://github.com/ChenneyZhuang/laya-browser-agent && cd laya-browser-agent && pip install -e '.[all]'` (Apple Silicon) o `.[torch]` (resto).
+
 ```bash
 pip install 'laya-browser-agent[mlx]'      # Apple Silicon
 pip install 'laya-browser-agent[torch]'    # Linux / Windows / Intel Mac

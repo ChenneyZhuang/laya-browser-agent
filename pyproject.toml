@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "laya-browser-agent"
-version = "0.1.0"
+version = "0.2.0"
 description = "Browser agent decisions with Laya, the open System 1 model — a local, open-source alternative to TypeSafe Jev. No cloud, no API key, no screenshots."
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
 authors = [{ name = "Chenney Zhuang" }]
 keywords = ["browser-agent", "system-one", "decision-model", "laya", "local-first", "agent", "mcp", "playwright", "cdp"]
