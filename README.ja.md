@@ -29,6 +29,10 @@ pip install 'laya-browser-agent[torch]'    # Linux / Windows / Intel Mac
 localdecide doctor                  # ハードウェア診断 + スモークテスト
 ```
 
+### 公式 Jev API での実検証
+
+本プロジェクトの `systemone` 方言は、2026-09-22 に TypeSafe の本番エンドポイント（`api.typesafe.ai/v1/systemone`、モデル `jev-1.13.0`）で実検証済み。**すべての質問タイプに `criteria` が必須**——`choice` は「選択肢 → 説明」のマップ、`score` は配列。同じリクエストをローカルの `localdecide serve` に向ければローカル Laya モデルが同じ形式で回答し、切り替えは base URL を変えるだけ。
+
 ## 主な特徴
 
 - モデルは観測した要素からしか選べない（セレクタや座標にはならない）

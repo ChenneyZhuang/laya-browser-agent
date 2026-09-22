@@ -59,6 +59,48 @@ Measured on an M4 MacBook Air, 16 GB (see [Benchmarks](#benchmarks)):
 | Browser harness | [jev-ultrafast](https://github.com/browser-use/jev-ultrafast) (12.6k★) | — | **included**: loop, drivers, guards, skills |
 | Page leaves your machine | yes | no | **no** |
 
+### Verified against the real Jev API
+
+This repo's `systemone` dialect was validated end-to-end against TypeSafe's
+production endpoint (`api.typesafe.ai/v1/systemone`, model `jev-1.13.0`) on
+2026-09-22. A working request looks like this — note that **`criteria` is
+required for every question type** (the API rejects questions without it), and
+for `choice` it is a *map of option → rubric description*, not a string:
+
+```json
+{
+  "state": "Hi, my pool pump stopped working...",
+  "model": "jev-latest",
+  "questions": {
+    "is_pool_lead": {
+      "type": "noul",
+      "instructions": "Is this a swimming-pool related service request?",
+      "criteria": {
+        "true": "Related to pool maintenance, construction, or supplies",
+        "false": "Not pool related"
+      }
+    },
+    "urgency": {
+      "type": "choice",
+      "instructions": "Which urgency level?",
+      "criteria": {
+        "low": "Routine inquiry",
+        "medium": "Wants service soon",
+        "high": "Emergency or explicitly time-sensitive"
+      }
+    }
+  }
+}
+```
+
+Response: `{"model":"jev-1.13.0","answers":{"is_pool_lead":{"noul":0.99},
+"urgency":{"choice":"high","confidence":1.0,...}},"usage":{"input_tokens":398,"output_tokens":58}}`
+
+The same payload, with `url` pointed at the bundled `localdecide serve`
+(`POST /v1/systemone`), produces the same answer shape from the local Laya
+checkpoint — so code written against one works against the other by changing
+one base URL. `score` questions take `criteria` as an **array** of level names.
+
 If you have read about Jev's "System One" model and want the same idea — typed,
 calibrated decisions instead of generated text — running locally for your browser
 agents, this is the wiring for it. It uses the browser-tuned Laya checkpoint

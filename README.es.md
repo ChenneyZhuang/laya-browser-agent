@@ -29,6 +29,10 @@ pip install 'laya-browser-agent[torch]'    # Linux / Windows / Intel Mac
 localdecide doctor                  # diagnóstico de hardware + prueba de humo
 ```
 
+### Verificado contra la API real de Jev
+
+El dialecto `systemone` de este repositorio fue validado de extremo a extremo contra el endpoint de producción de TypeSafe (`api.typesafe.ai/v1/systemone`, modelo `jev-1.13.0`) el 2026-09-22. **Cada tipo de pregunta exige el campo `criteria`** — en `choice` es un mapa de opción → descripción (no un string), en `score` es un array. El mismo payload apuntado al `localdecide serve` local produce la misma forma de respuesta con el modelo Laya local; cambiar de uno a otro es cambiar una sola URL base.
+
 ## Relación con Jev y Laya
 
 Si has leído sobre el modelo "System One" de Jev y quieres la misma idea — decisiones tipadas y calibradas en lugar de texto generado — ejecutándose localmente para tus agentes de navegador, este es el proyecto. Ejecuta el checkpoint de Laya afinado para navegadores y añade lo que ninguno de los dos proyectos incluye: observación de tabla de elementos, validación de respuestas, puerta de confianza, guardias de bucle y un servidor compatible con TypeSafe.

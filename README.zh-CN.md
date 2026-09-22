@@ -56,6 +56,10 @@ with PlaywrightDriver(start_url="https://en.wikipedia.org/wiki/Main_Page") as dr
     print(run.stopped, run.summary()["median_decision_ms"], "ms/决策")
 ```
 
+### 已对官方 Jev API 实测验证
+
+本项目的 `systemone` 方言已于 2026-09-22 对 TypeSafe 生产端点（`api.typesafe.ai/v1/systemone`，模型 `jev-1.13.0`）完整实测。注意：**每种题型都必须带 `criteria` 字段**——`choice` 的 `criteria` 是「选项 → 评分说明」的映射（不是字符串），`score` 的是数组。同一份请求体把 URL 换成本地 `localdecide serve` 即可用本地 Laya 模型得到相同结构的回答，切换只需改一个 base URL。
+
 ## 与 Jev / Laya 的关系
 
 | | [TypeSafe Jev](https://docs.typesafe.ai) | [Laya](https://github.com/NandhaKishorM/laya) | **laya-browser-agent** |
