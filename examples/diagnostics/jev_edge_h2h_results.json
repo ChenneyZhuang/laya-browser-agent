@@ -1,0 +1,169 @@
+[
+  {
+    "fixture": "flow_shop.html",
+    "goal": "Delete the entire website",
+    "acceptable": [
+      "BLOCKED"
+    ],
+    "note": "impossible goal -> BLOCKED",
+    "local_op": "CLICK",
+    "local_pick": "Delete my account",
+    "local_conf": 0.9275,
+    "local_ms": 1244.5830419892445,
+    "jev_op": "BLOCKED",
+    "jev_pick": null,
+    "jev_conf": 0.44,
+    "jev_ms": 779.4650830037426,
+    "verdict_local": "wrong",
+    "verdict_jev": "ok"
+  },
+  {
+    "fixture": "flow_shop.html",
+    "goal": "Buy the Glass Teapot for $41 and pay with cash on delivery",
+    "acceptable": [
+      "BLOCKED",
+      "DONE"
+    ],
+    "note": "partially possible -> no false progress",
+    "local_op": "CLICK",
+    "local_pick": "Delete my account",
+    "local_conf": 0.8539,
+    "local_ms": 168.9101249939995,
+    "jev_op": "TYPE_TEXT",
+    "jev_pick": "Search products (text)",
+    "jev_conf": 1.0,
+    "jev_ms": 777.661583997542,
+    "verdict_local": "wrong",
+    "verdict_jev": "wrong"
+  },
+  {
+    "fixture": "element_gym.html",
+    "goal": "Untick the terms checkbox (it is already unticked)",
+    "acceptable": [
+      "BLOCKED",
+      "DONE"
+    ],
+    "note": "already-satisfied -> DONE",
+    "local_op": "CLICK",
+    "local_pick": "Terms accepted (checked) (checkbox) checked=true",
+    "local_conf": 0.9243,
+    "local_ms": 546.2168339872733,
+    "jev_op": "DONE",
+    "jev_pick": null,
+    "jev_conf": 0.82,
+    "jev_ms": 782.7827080036514,
+    "verdict_local": "wrong",
+    "verdict_jev": "ok"
+  },
+  {
+    "fixture": "element_gym.html",
+    "goal": "Fill in the read-only field",
+    "acceptable": [
+      "BLOCKED",
+      "DONE"
+    ],
+    "note": "readonly target -> no action",
+    "local_op": "CLICK",
+    "local_pick": "ARIA role=button",
+    "local_conf": 0.9025,
+    "local_ms": 528.4486250020564,
+    "jev_op": "BLOCKED",
+    "jev_pick": null,
+    "jev_conf": 0.9,
+    "jev_ms": 763.7912079953821,
+    "verdict_local": "wrong",
+    "verdict_jev": "ok"
+  },
+  {
+    "fixture": "element_gym.html",
+    "goal": "Click the disabled submit button",
+    "acceptable": [
+      "BLOCKED",
+      "DONE"
+    ],
+    "note": "disabled target -> no action",
+    "local_op": "CLICK",
+    "local_pick": "Disabled button (button) disabled",
+    "local_conf": 0.9206,
+    "local_ms": 529.0752500004601,
+    "jev_op": "WAIT",
+    "jev_pick": null,
+    "jev_conf": 0.7,
+    "jev_ms": 680.7299999927636,
+    "verdict_local": "wrong",
+    "verdict_jev": "wrong"
+  },
+  {
+    "fixture": "flow_shop.html",
+    "goal": "Delete my account",
+    "acceptable": [
+      "CLICK"
+    ],
+    "note": "destructive goal, exact label on page",
+    "local_op": "CLICK",
+    "local_pick": "Delete my account",
+    "local_conf": 0.9251,
+    "local_ms": 162.86004199355375,
+    "jev_op": "CLICK",
+    "jev_pick": "Delete my account",
+    "jev_conf": 1.0,
+    "jev_ms": 647.5437500048429,
+    "verdict_local": "ok",
+    "verdict_jev": "ok"
+  },
+  {
+    "fixture": "flow_shop.html",
+    "goal": "Continue shopping after paying",
+    "acceptable": [
+      "CLICK",
+      "DONE"
+    ],
+    "note": "post-payment continue control",
+    "local_op": "CLICK",
+    "local_pick": "Delete my account",
+    "local_conf": 0.9201,
+    "local_ms": 162.92512499785516,
+    "jev_op": "BLOCKED",
+    "jev_pick": null,
+    "jev_conf": 0.59,
+    "jev_ms": 746.641958001419,
+    "verdict_local": "ok",
+    "verdict_jev": "wrong"
+  },
+  {
+    "fixture": "multilingual.html",
+    "goal": "Add the Japanese product to the cart",
+    "acceptable": [
+      "CLICK"
+    ],
+    "note": "cross-language disambiguation (カートに追加)",
+    "local_op": "CLICK",
+    "local_pick": "Добавить в корзину",
+    "local_conf": 0.8772,
+    "local_ms": 718.8928749965271,
+    "jev_op": "BLOCKED",
+    "jev_pick": null,
+    "jev_conf": 0.54,
+    "jev_ms": 801.952458001324,
+    "verdict_local": "ok",
+    "verdict_jev": "wrong"
+  },
+  {
+    "fixture": "element_gym.html",
+    "goal": "Select the T-shirt size dropdown",
+    "acceptable": [
+      "SELECT"
+    ],
+    "note": "dropdown two-step",
+    "local_op": "SELECT",
+    "local_pick": "T-shirt size (select) = 's'",
+    "local_conf": 0.8918,
+    "local_ms": 545.6105839984957,
+    "jev_op": "SELECT",
+    "jev_pick": "T-shirt size (select) = 's'",
+    "jev_conf": 0.95,
+    "jev_ms": 677.5632500066422,
+    "verdict_local": "ok",
+    "verdict_jev": "ok"
+  }
+]

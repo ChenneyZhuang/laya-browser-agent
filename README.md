@@ -144,6 +144,25 @@ What this means in practice:
   the open problem for both engines. This battery exists so you can re-run
   the comparison yourself; numbers here are from 2026-09-22, jev-1.13.0.
 
+Two more batteries round out the picture:
+
+**Text classification** (`jev_text_h2h.py` — real business texts, no browser):
+
+| family (21 cases) | local v10s | hosted jev-1.13.0 |
+|---|---|---|
+| pool-lead triage: `relevant` noul | 3/7 labelled correct | **7/7** |
+| pool `lead_quality` score (0-4) | low-biased (1.0-2.0) | **calibrated (2.4-3.7)** |
+| Chinese SMS: transaction / type | **6/8** | 6/8 |
+| Chinese SMS: **phishing detection** | **0/3** | **3/3** |
+| robustness (empty / 5k chars / adversarial) | 3/3 | 3/3 |
+| median latency | **36 ms** | 738 ms |
+
+The phishing row deserves a stare: local v10s scored the classic "妈妈，我手机坏了…快转5000" scam at p=0.14 and the lucky-red-packet scam at p=0.23 — it would wave both through. Hosted Jev put both at p=0.96. For any safety-adjacent routing (fraud, abuse, self-harm), local v10s in its current form is not safe to trust alone.
+
+**Browser edge cases** (`jev_edge_h2h.py` — goals where restraint is the right answer, 9 cases): local 4/9, hosted 5/9, and they fail in *opposite* directions. Local v10s is a fire-and-act model: it clicks "Delete my account" (p=0.93) when asked to delete *the entire website*, unticks an already-unticked checkbox, and clicks a disabled button — near-certain confidence every time. Hosted Jev blocks the impossible goals but also over-blocks legitimate ones (missed "Delete my account" as a real goal). Neither engine has a trustworthy notion of "this goal cannot be done here" yet; the harness's own guards (disabled-element checks, confirmation gates) are what catch these today.
+
+Practical summary across all four batteries: use hosted Jev when accuracy and safety calibration matter and per-call cost is fine; use local v10s when latency (10-20x faster), privacy, or free-at-volume matters, and let the harness guards compensate for its overconfidence. Fine-tuning data for the weakest axes (Chinese grounding, phishing, restraint) is exactly what the training recipe in this repo's diagnostics produces.
+
 If you have read about Jev's "System One" model and want the same idea — typed,
 calibrated decisions instead of generated text — running locally for your browser
 agents, this is the wiring for it. It uses the browser-tuned Laya checkpoint

@@ -48,6 +48,24 @@ Flujos multi-paso: **ningún motor completa hoy el flujo de compra scripted sin 
 
 El dialecto `systemone` de este repositorio fue validado de extremo a extremo contra el endpoint de producción de TypeSafe (`api.typesafe.ai/v1/systemone`, modelo `jev-1.13.0`) el 2026-09-22. **Cada tipo de pregunta exige el campo `criteria`** — en `choice` es un mapa de opción → descripción (no un string), en `score` es un array. El mismo payload apuntado al `localdecide serve` local produce la misma forma de respuesta con el modelo Laya local; cambiar de uno a otro es cambiar una sola URL base.
 
+
+
+**Clasificación de texto** (`jev_text_h2h.py`, textos reales, 21 casos):
+
+| tarea | local v10s | Jev oficial |
+|---|---|---|
+| leads de piscina `relevant` | 3/7 correctos | **7/7** |
+| calidad de lead (0-4) | sesgo bajo (1.0-2.0) | **calibrado (2.4-3.7)** |
+| SMS chino: transacción/tipo | **6/8** | 6/8 |
+| SMS chino: **detección de phishing** | **0/3** | **3/3** |
+| robustez (vacío/5k caracteres/adversarial) | 3/3 | 3/3 |
+| latencia mediana | **36ms** | 738ms |
+
+La fila de phishing merece atención: v10s local dio p=0.14 a la estafa clásica "mamá, se me rompió el teléfono… transfiere 5000" y p=0.23 a la del sobre rojo — las dejaría pasar. Jev oficial: p=0.96 en ambas. **Para cualquier enrutado sensible a seguridad, el modelo local solo no es confiable hoy.**
+
+**Casos extremos de navegador** (`jev_edge_h2h.py`, 9 casos donde lo correcto es abstenerse): local 4/9, oficial 5/9, y fallan en direcciones opuestas. v10s es de disparar primero: pide borrar el sitio web entero y pulsa "Delete my account" (p=0.93), desmarca lo ya desmarcado y clica botones deshabilitados, siempre con ~0.9 de confianza. El Jev oficial bloquea lo imposible pero también bloquea metas legítimas. Ninguno tiene aún un concepto fiable de "esta meta no se puede lograr"; los guards del harness son lo que salva estos casos hoy.
+
+Conclusión práctica de las cuatro baterías: precisión y calibración de seguridad → Jev oficial; latencia (10-20x más rápido), privacidad o volumen gratuito → local + guards. El grounding chino, el phishing y la contención son exactamente los ejes a afinar con el fine-tuning.
 ## Relación con Jev y Laya
 
 Si has leído sobre el modelo "System One" de Jev y quieres la misma idea — decisiones tipadas y calibradas en lugar de texto generado — ejecutándose localmente para tus agentes de navegador, este es el proyecto. Ejecuta el checkpoint de Laya afinado para navegadores y añade lo que ninguno de los dos proyectos incluye: observación de tabla de elementos, validación de respuestas, puerta de confianza, guardias de bucle y un servidor compatible con TypeSafe.

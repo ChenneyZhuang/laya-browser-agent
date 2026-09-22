@@ -1,0 +1,870 @@
+[
+  {
+    "family": "pool",
+    "case": "Hi, my pool pump stopped working and there's water",
+    "expect": {
+      "relevant": true,
+      "lead_quality": 3
+    },
+    "local": {
+      "ok": true,
+      "ms": 798.3644580090186,
+      "answers": {
+        "relevant": {
+          "p": 0.9649
+        },
+        "lead_quality": {
+          "value": 1.9825,
+          "conf": 0.2342
+        },
+        "category": {
+          "value": "service",
+          "conf": 0.4717
+        }
+      }
+    },
+    "jev": {
+      "ok": true,
+      "ms": 689.6323330001906,
+      "answers": {
+        "relevant": {
+          "p": 0.98
+        },
+        "lead_quality": {
+          "value": 3.58,
+          "conf": 0.65
+        },
+        "category": {
+          "value": "service",
+          "conf": 1.0
+        }
+      }
+    }
+  },
+  {
+    "family": "pool",
+    "case": "Looking for a quote on a new concrete pool, about ",
+    "expect": {
+      "relevant": true,
+      "lead_quality": 3
+    },
+    "local": {
+      "ok": true,
+      "ms": 33.967208000831306,
+      "answers": {
+        "relevant": {
+          "p": 0.2984
+        },
+        "lead_quality": {
+          "value": 1.004,
+          "conf": 0.7689
+        },
+        "category": {
+          "value": "construction",
+          "conf": 0.8568
+        }
+      }
+    },
+    "jev": {
+      "ok": true,
+      "ms": 626.5434590022778,
+      "answers": {
+        "relevant": {
+          "p": 0.99
+        },
+        "lead_quality": {
+          "value": 3.06,
+          "conf": 0.78
+        },
+        "category": {
+          "value": "construction",
+          "conf": 1.0
+        }
+      }
+    }
+  },
+  {
+    "family": "pool",
+    "case": "Do you sell pool tablets in bulk? We run a motel w",
+    "expect": {
+      "relevant": true,
+      "lead_quality": 2
+    },
+    "local": {
+      "ok": true,
+      "ms": 41.35537499678321,
+      "answers": {
+        "relevant": {
+          "p": 0.1363
+        },
+        "lead_quality": {
+          "value": 0.7045,
+          "conf": 0.4772
+        },
+        "category": {
+          "value": "not_pool",
+          "conf": 0.2
+        }
+      }
+    },
+    "jev": {
+      "ok": true,
+      "ms": 646.8848340009572,
+      "answers": {
+        "relevant": {
+          "p": 0.98
+        },
+        "lead_quality": {
+          "value": 2.9,
+          "conf": 0.69
+        },
+        "category": {
+          "value": "supplies",
+          "conf": 1.0
+        }
+      }
+    }
+  },
+  {
+    "family": "pool",
+    "case": "My neighbour's pool fence is broken, can you repai",
+    "expect": {
+      "relevant": true,
+      "lead_quality": 2
+    },
+    "local": {
+      "ok": true,
+      "ms": 30.96529099275358,
+      "answers": {
+        "relevant": {
+          "p": 0.0
+        },
+        "lead_quality": {
+          "value": 1.9577,
+          "conf": 0.2268
+        },
+        "category": {
+          "value": "service",
+          "conf": 0.9007
+        }
+      }
+    },
+    "jev": {
+      "ok": true,
+      "ms": 802.1107089880388,
+      "answers": {
+        "relevant": {
+          "p": 0.9
+        },
+        "lead_quality": {
+          "value": 2.44,
+          "conf": 0.39
+        },
+        "category": {
+          "value": "service",
+          "conf": 1.0
+        }
+      }
+    }
+  },
+  {
+    "family": "pool",
+    "case": "Hi, I need my car's coolant flushed. Do you do rad",
+    "expect": {
+      "relevant": false,
+      "category": "not_pool"
+    },
+    "local": {
+      "ok": true,
+      "ms": 36.23441701347474,
+      "answers": {
+        "relevant": {
+          "p": 0.0238
+        },
+        "lead_quality": {
+          "value": 2.3482,
+          "conf": 0.0898
+        },
+        "category": {
+          "value": "service",
+          "conf": 0.3575
+        }
+      }
+    },
+    "jev": {
+      "ok": true,
+      "ms": 701.9098750024568,
+      "answers": {
+        "relevant": {
+          "p": 0.01
+        },
+        "lead_quality": {
+          "value": 0.0,
+          "conf": 1.0
+        },
+        "category": {
+          "value": "service",
+          "conf": 0.4
+        }
+      }
+    }
+  },
+  {
+    "family": "pool",
+    "case": "We install solar panels. Are you interested in a c",
+    "expect": {
+      "relevant": false,
+      "category": "not_pool"
+    },
+    "local": {
+      "ok": true,
+      "ms": 40.80200000316836,
+      "answers": {
+        "relevant": {
+          "p": 0.1508
+        },
+        "lead_quality": {
+          "value": 2.9062,
+          "conf": 0.2157
+        },
+        "category": {
+          "value": "supplies",
+          "conf": 0.6028
+        }
+      }
+    },
+    "jev": {
+      "ok": true,
+      "ms": 726.622457994381,
+      "answers": {
+        "relevant": {
+          "p": 0.01
+        },
+        "lead_quality": {
+          "value": 0.01,
+          "conf": 1.0
+        },
+        "category": {
+          "value": "not_pool",
+          "conf": 0.98
+        }
+      }
+    }
+  },
+  {
+    "family": "pool",
+    "case": "Looking for a puppy grooming appointment this week",
+    "expect": {
+      "relevant": false,
+      "category": "not_pool"
+    },
+    "local": {
+      "ok": true,
+      "ms": 34.78779199940618,
+      "answers": {
+        "relevant": {
+          "p": 0.0
+        },
+        "lead_quality": {
+          "value": 1.2416,
+          "conf": 0.4358
+        },
+        "category": {
+          "value": "service",
+          "conf": 0.2605
+        }
+      }
+    },
+    "jev": {
+      "ok": true,
+      "ms": 723.7778749986319,
+      "answers": {
+        "relevant": {
+          "p": 0.01
+        },
+        "lead_quality": {
+          "value": 0.0,
+          "conf": 1.0
+        },
+        "category": {
+          "value": "not_pool",
+          "conf": 0.36
+        }
+      }
+    }
+  },
+  {
+    "family": "pool",
+    "case": "URGENT: your domain is about to expire, click here",
+    "expect": {
+      "relevant": false,
+      "category": "not_pool"
+    },
+    "local": {
+      "ok": true,
+      "ms": 35.49854199809488,
+      "answers": {
+        "relevant": {
+          "p": 0.0071
+        },
+        "lead_quality": {
+          "value": 1.5051,
+          "conf": 0.0553
+        },
+        "category": {
+          "value": "construction",
+          "conf": 0.0922
+        }
+      }
+    },
+    "jev": {
+      "ok": true,
+      "ms": 811.2434169888729,
+      "answers": {
+        "relevant": {
+          "p": 0.01
+        },
+        "lead_quality": {
+          "value": 0.0,
+          "conf": 1.0
+        },
+        "category": {
+          "value": "not_pool",
+          "conf": 0.96
+        }
+      }
+    }
+  },
+  {
+    "family": "pool",
+    "case": "(empty)",
+    "expect": {
+      "relevant": false,
+      "category": "not_pool"
+    },
+    "local": {
+      "ok": true,
+      "ms": 29.85987500869669,
+      "answers": {
+        "relevant": {
+          "p": 0.0
+        },
+        "lead_quality": {
+          "value": 0.0036,
+          "conf": 0.9853
+        },
+        "category": {
+          "value": "not_pool",
+          "conf": 0.0637
+        }
+      }
+    },
+    "jev": {
+      "ok": true,
+      "ms": 670.6619590113405,
+      "answers": {
+        "relevant": {
+          "p": 0.1
+        },
+        "lead_quality": {
+          "value": 0.01,
+          "conf": 0.99
+        },
+        "category": {
+          "value": "not_pool",
+          "conf": 1.0
+        }
+      }
+    }
+  },
+  {
+    "family": "pool",
+    "case": "泳池水泵坏了，需要今天上门维修，在Crestwood附近。",
+    "expect": {
+      "relevant": true,
+      "lead_quality": 2
+    },
+    "local": {
+      "ok": true,
+      "ms": 41.250958005548455,
+      "answers": {
+        "relevant": {
+          "p": 0.0
+        },
+        "lead_quality": {
+          "value": 1.1138,
+          "conf": 0.7314
+        },
+        "category": {
+          "value": "service",
+          "conf": 0.8226
+        }
+      }
+    },
+    "jev": {
+      "ok": true,
+      "ms": 861.2816670065513,
+      "answers": {
+        "relevant": {
+          "p": 0.98
+        },
+        "lead_quality": {
+          "value": 3.61,
+          "conf": 0.68
+        },
+        "category": {
+          "value": "service",
+          "conf": 1.0
+        }
+      }
+    }
+  },
+  {
+    "family": "sms",
+    "case": "【招商银行】您尾号1234的账户于09月22日10:01支出人民币299",
+    "expect": {
+      "is_transaction": true,
+      "is_phishing": false,
+      "txn_type": "expense"
+    },
+    "local": {
+      "ok": true,
+      "ms": 40.16187498928048,
+      "answers": {
+        "is_transaction": {
+          "p": 0.9418
+        },
+        "txn_type": {
+          "value": "expense",
+          "conf": 0.0529
+        },
+        "is_phishing": {
+          "p": 0.0
+        }
+      }
+    },
+    "jev": {
+      "ok": true,
+      "ms": 776.1172499886015,
+      "answers": {
+        "is_transaction": {
+          "p": 0.99
+        },
+        "txn_type": {
+          "value": "expense",
+          "conf": 1.0
+        },
+        "is_phishing": {
+          "p": 0.12
+        }
+      }
+    }
+  },
+  {
+    "family": "sms",
+    "case": "【支付宝】转账收款：已收到来自张*的转账 ￥500.00",
+    "expect": {
+      "is_transaction": true,
+      "is_phishing": false,
+      "txn_type": "income"
+    },
+    "local": {
+      "ok": true,
+      "ms": 33.72737500467338,
+      "answers": {
+        "is_transaction": {
+          "p": 0.9576
+        },
+        "txn_type": {
+          "value": "transfer",
+          "conf": 0.8952
+        },
+        "is_phishing": {
+          "p": 0.0
+        }
+      }
+    },
+    "jev": {
+      "ok": true,
+      "ms": 753.5825419909088,
+      "answers": {
+        "is_transaction": {
+          "p": 0.99
+        },
+        "txn_type": {
+          "value": "transfer",
+          "conf": 0.41
+        },
+        "is_phishing": {
+          "p": 0.19
+        }
+      }
+    }
+  },
+  {
+    "family": "sms",
+    "case": "妈妈，我手机坏了，这个是新号码，急用钱，快转5000到这个卡号6222.",
+    "expect": {
+      "is_transaction": true,
+      "is_phishing": true,
+      "txn_type": "expense"
+    },
+    "local": {
+      "ok": true,
+      "ms": 43.48416700668167,
+      "answers": {
+        "is_transaction": {
+          "p": 0.9591
+        },
+        "txn_type": {
+          "value": "transfer",
+          "conf": 0.9152
+        },
+        "is_phishing": {
+          "p": 0.1429
+        }
+      }
+    },
+    "jev": {
+      "ok": true,
+      "ms": 847.7497919957386,
+      "answers": {
+        "is_transaction": {
+          "p": 0.49
+        },
+        "txn_type": {
+          "value": "transfer",
+          "conf": 0.9
+        },
+        "is_phishing": {
+          "p": 0.96
+        }
+      }
+    }
+  },
+  {
+    "family": "sms",
+    "case": "【工商银行】尊敬的客户，您已成功办理定期存款业务",
+    "expect": {
+      "is_transaction": true,
+      "is_phishing": false,
+      "txn_type": "other"
+    },
+    "local": {
+      "ok": true,
+      "ms": 42.82600000442471,
+      "answers": {
+        "is_transaction": {
+          "p": 0.9886
+        },
+        "txn_type": {
+          "value": "other",
+          "conf": 0.0328
+        },
+        "is_phishing": {
+          "p": 0.0016
+        }
+      }
+    },
+    "jev": {
+      "ok": true,
+      "ms": 736.7346249957336,
+      "answers": {
+        "is_transaction": {
+          "p": 0.91
+        },
+        "txn_type": {
+          "value": "transfer",
+          "conf": 0.36
+        },
+        "is_phishing": {
+          "p": 0.21
+        }
+      }
+    }
+  },
+  {
+    "family": "sms",
+    "case": "今天中午一起吃饭吗？老地方。",
+    "expect": {
+      "is_transaction": false,
+      "is_phishing": false
+    },
+    "local": {
+      "ok": true,
+      "ms": 35.674584010848776,
+      "answers": {
+        "is_transaction": {
+          "p": 0.0
+        },
+        "txn_type": {
+          "value": "expense",
+          "conf": 0.0123
+        },
+        "is_phishing": {
+          "p": 0.0
+        }
+      }
+    },
+    "jev": {
+      "ok": true,
+      "ms": 738.352540996857,
+      "answers": {
+        "is_transaction": {
+          "p": 0.01
+        },
+        "txn_type": {
+          "value": "other",
+          "conf": 0.68
+        },
+        "is_phishing": {
+          "p": 0.04
+        }
+      }
+    }
+  },
+  {
+    "family": "sms",
+    "case": "【京东】您的订单已发货，预计明天送达",
+    "expect": {
+      "is_transaction": false,
+      "is_phishing": false
+    },
+    "local": {
+      "ok": true,
+      "ms": 35.95945799315814,
+      "answers": {
+        "is_transaction": {
+          "p": 0.0
+        },
+        "txn_type": {
+          "value": "expense",
+          "conf": 0.0313
+        },
+        "is_phishing": {
+          "p": 0.0
+        }
+      }
+    },
+    "jev": {
+      "ok": true,
+      "ms": 737.1434579981724,
+      "answers": {
+        "is_transaction": {
+          "p": 0.09
+        },
+        "txn_type": {
+          "value": "expense",
+          "conf": 0.55
+        },
+        "is_phishing": {
+          "p": 0.21
+        }
+      }
+    }
+  },
+  {
+    "family": "sms",
+    "case": "恭喜您被抽中幸运用户，点击链接领取888元现金红包！",
+    "expect": {
+      "is_transaction": false,
+      "is_phishing": true
+    },
+    "local": {
+      "ok": true,
+      "ms": 32.813958008773625,
+      "answers": {
+        "is_transaction": {
+          "p": 0.9966
+        },
+        "txn_type": {
+          "value": "expense",
+          "conf": 0.1964
+        },
+        "is_phishing": {
+          "p": 0.2288
+        }
+      }
+    },
+    "jev": {
+      "ok": true,
+      "ms": 681.545792001998,
+      "answers": {
+        "is_transaction": {
+          "p": 0.2
+        },
+        "txn_type": {
+          "value": "income",
+          "conf": 0.67
+        },
+        "is_phishing": {
+          "p": 0.95
+        }
+      }
+    }
+  },
+  {
+    "family": "sms",
+    "case": "【建设银行】您尾号8888的信用卡账单已出，最低还款额1,200元",
+    "expect": {
+      "is_transaction": true,
+      "is_phishing": false,
+      "txn_type": "expense"
+    },
+    "local": {
+      "ok": true,
+      "ms": 33.43441600736696,
+      "answers": {
+        "is_transaction": {
+          "p": 0.8986
+        },
+        "txn_type": {
+          "value": "expense",
+          "conf": 0.8776
+        },
+        "is_phishing": {
+          "p": 0.0487
+        }
+      }
+    },
+    "jev": {
+      "ok": true,
+      "ms": 717.6741669973126,
+      "answers": {
+        "is_transaction": {
+          "p": 0.55
+        },
+        "txn_type": {
+          "value": "expense",
+          "conf": 0.7
+        },
+        "is_phishing": {
+          "p": 0.33
+        }
+      }
+    }
+  },
+  {
+    "family": "robust",
+    "case": "empty state",
+    "expect": {
+      "relevant": false
+    },
+    "local": {
+      "ok": true,
+      "ms": 41.35412500181701,
+      "answers": {
+        "relevant": {
+          "p": 0.0
+        },
+        "lead_quality": {
+          "value": 0.8858,
+          "conf": 0.3597
+        },
+        "category": {
+          "value": "not_pool",
+          "conf": 0.1473
+        }
+      }
+    },
+    "jev": {
+      "ok": true,
+      "ms": 643.0539169959957,
+      "answers": {
+        "relevant": {
+          "p": 0.42
+        },
+        "lead_quality": {
+          "value": 0.02,
+          "conf": 0.98
+        },
+        "category": {
+          "value": "not_pool",
+          "conf": 0.99
+        }
+      }
+    }
+  },
+  {
+    "family": "robust",
+    "case": "5000+ char state",
+    "expect": {
+      "relevant": false
+    },
+    "local": {
+      "ok": true,
+      "ms": 546.6850829980103,
+      "answers": {
+        "relevant": {
+          "p": 0.0002
+        },
+        "lead_quality": {
+          "value": 1.2114,
+          "conf": 0.2356
+        },
+        "category": {
+          "value": "not_pool",
+          "conf": 0.0325
+        }
+      }
+    },
+    "jev": {
+      "ok": true,
+      "ms": 744.8230829904787,
+      "answers": {
+        "relevant": {
+          "p": 0.02
+        },
+        "lead_quality": {
+          "value": 0.01,
+          "conf": 0.99
+        },
+        "category": {
+          "value": "not_pool",
+          "conf": 1.0
+        }
+      }
+    }
+  },
+  {
+    "family": "robust",
+    "case": "adversarial: pool wording on a non-pool business",
+    "expect": {
+      "relevant": false
+    },
+    "local": {
+      "ok": true,
+      "ms": 47.9346250067465,
+      "answers": {
+        "relevant": {
+          "p": 0.0
+        },
+        "lead_quality": {
+          "value": 3.811,
+          "conf": 0.702
+        },
+        "category": {
+          "value": "not_pool",
+          "conf": 0.9044
+        }
+      }
+    },
+    "jev": {
+      "ok": true,
+      "ms": 671.5945420000935,
+      "answers": {
+        "relevant": {
+          "p": 0.3
+        },
+        "lead_quality": {
+          "value": 0.38,
+          "conf": 0.68
+        },
+        "category": {
+          "value": "not_pool",
+          "conf": 0.7
+        }
+      }
+    }
+  }
+]
