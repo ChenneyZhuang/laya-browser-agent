@@ -101,6 +101,49 @@ The same payload, with `url` pointed at the bundled `localdecide serve`
 checkpoint — so code written against one works against the other by changing
 one base URL. `score` questions take `criteria` as an **array** of level names.
 
+### Head-to-head vs hosted Jev: measured, not claimed
+
+`examples/diagnostics/jev_head_to_head.py` runs the same 12 single-step
+element-table decisions through both engines — the local Laya v10s checkpoint
+and TypeSafe's production `jev-1.13.0` — on the same fixture pages with the
+same question contract. `examples/diagnostics/jev_flow_h2h.py` does the same
+for six full task flows driven through the real browser loop (history,
+scoping, guards all active for both engines).
+
+Single-step, zero-context (12 goals, 3 fixtures, 6 languages):
+
+| | local v10s | hosted jev-1.13.0 |
+|---|---|---|
+| strict element hits | 4/12 | **8/12** |
+| cross-lingual goals | 1/6 | **5/6** |
+| median decision latency | **618 ms** | 716 ms |
+| mean confidence | 0.90 (overconfident) | 0.81 |
+| engines pick the same element | 2/12 | — |
+
+Multi-step flows (6 flows x 2 engines): **neither engine solves the scripted
+shop flow unaided today.** The hard state is the one right after typing a
+search query: the goal names a product the page does not show yet, and both
+engines lose the thread there — local v10s clicks Search again at p=0.84 even
+with the product visible, hosted Jev answers BLOCKED or picks the right
+element at p=0.45. Local v10s *did* solve the Chinese navigation flow
+end-to-end (帮助中心 -> DONE); hosted Jev reached the same element but never
+emitted DONE.
+
+What this means in practice:
+
+- **If you want accuracy out of the box, especially cross-lingual, hosted Jev
+  is measurably better.** At ~$0.042/M input tokens a typical decision costs
+  ~$0.000017.
+- **If you want privacy, offline, or free at volume, the local checkpoint is
+  competitive on latency and honest about confidence** (0.90 vs 0.81 mean —
+  calibration work helps here), but it needs the harness loop to hit its
+  trained regime, and its multilingual grounding is the weakest axis.
+- The headline "62% task success" for the browser-tuned checkpoint comes from
+  goals whose wording overlaps the page's own vocabulary. Goals that require
+  the model to bridge a vocabulary gap (type a word the page never shows) are
+  the open problem for both engines. This battery exists so you can re-run
+  the comparison yourself; numbers here are from 2026-09-22, jev-1.13.0.
+
 If you have read about Jev's "System One" model and want the same idea — typed,
 calibrated decisions instead of generated text — running locally for your browser
 agents, this is the wiring for it. It uses the browser-tuned Laya checkpoint

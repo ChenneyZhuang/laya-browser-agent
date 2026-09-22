@@ -32,3 +32,4 @@ models/
 # Scratch
 *.log
 /tmp/
+CODEX_3080_FINETUNE_TASK.md

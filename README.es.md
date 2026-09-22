@@ -29,6 +29,21 @@ pip install 'laya-browser-agent[torch]'    # Linux / Windows / Intel Mac
 localdecide doctor                  # diagnóstico de hardware + prueba de humo
 ```
 
+### Enfrentamiento contra el Jev oficial: datos medidos
+
+`examples/diagnostics/jev_head_to_head.py` (un paso) y `jev_flow_h2h.py` (flujos completos) ejecutan las mismas tareas contra el Laya v10s local y el jev-1.13.0 oficial:
+
+| Un paso, sin contexto (12 metas / 6 idiomas) | local v10s | Jev oficial |
+|---|---|---|
+| Aciertos estrictos de elemento | 4/12 | **8/12** |
+| Metas multilingües | 1/6 | **5/6** |
+| Latencia mediana | **618ms** | 716ms |
+| Confianza media | 0.90 (sobreconfiado) | 0.81 |
+
+Flujos multi-paso: **ningún motor completa hoy el flujo de compra scripted sin ayuda** — el estado difícil es justo después de escribir la búsqueda; v10s local vuelve a pulsar Search (p=0.84) incluso con el producto visible, el Jev oficial responde BLOCKED o elige el elemento correcto con p=0.45. v10s local sí completó el flujo de navegación en chino (帮助中心→DONE).
+
+**Conclusión**: precisión inmediata (especialmente multilingüe) → Jev oficial (~$0.000017 por decisión); privacidad / offline / volumen gratis → versión local, con latencia comparable y multilingüe como su eje más débil.
+
 ### Verificado contra la API real de Jev
 
 El dialecto `systemone` de este repositorio fue validado de extremo a extremo contra el endpoint de producción de TypeSafe (`api.typesafe.ai/v1/systemone`, modelo `jev-1.13.0`) el 2026-09-22. **Cada tipo de pregunta exige el campo `criteria`** — en `choice` es un mapa de opción → descripción (no un string), en `score` es un array. El mismo payload apuntado al `localdecide serve` local produce la misma forma de respuesta con el modelo Laya local; cambiar de uno a otro es cambiar una sola URL base.

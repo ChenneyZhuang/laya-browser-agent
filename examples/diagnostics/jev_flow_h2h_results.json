@@ -1,0 +1,370 @@
+[
+  {
+    "engine": "local v10s",
+    "flow": "shop: search -> add kettle -> checkout",
+    "solved": false,
+    "error": "model is not confident enough to act (last: 0.07)",
+    "steps": [
+      {
+        "n": 1,
+        "op": "TYPE_TEXT",
+        "label": "Search products"
+      },
+      {
+        "n": 2,
+        "op": "CLICK",
+        "label": "Search"
+      },
+      {
+        "n": 3,
+        "op": "CLICK",
+        "label": "Search"
+      }
+    ],
+    "expect": [
+      "Steel Kettle",
+      "Checkout"
+    ],
+    "touched_all": false,
+    "hit": false,
+    "median_ms": 181,
+    "n_decisions": 3,
+    "wall_s": 2.8
+  },
+  {
+    "engine": "hosted jev-1.13.0",
+    "flow": "shop: search -> add kettle -> checkout",
+    "solved": false,
+    "error": "stuck: repeated action with no page change",
+    "steps": [
+      {
+        "n": 1,
+        "op": "TYPE_TEXT",
+        "label": "Search products"
+      },
+      {
+        "n": 2,
+        "op": "CLICK",
+        "label": "Search"
+      },
+      {
+        "n": 3,
+        "op": "CLICK",
+        "label": "Search"
+      },
+      {
+        "n": 4,
+        "op": "CLICK",
+        "label": "Search"
+      }
+    ],
+    "expect": [
+      "Steel Kettle",
+      "Checkout"
+    ],
+    "touched_all": false,
+    "hit": false,
+    "median_ms": 707,
+    "n_decisions": 4,
+    "wall_s": 5.0
+  },
+  {
+    "engine": "local v10s",
+    "flow": "shop: search -> add cheapest (Mug Set) -> checkout",
+    "solved": false,
+    "error": "stuck: repeated action with no page change",
+    "steps": [
+      {
+        "n": 1,
+        "op": "CLICK",
+        "label": "Search"
+      },
+      {
+        "n": 2,
+        "op": "CLICK",
+        "label": "Search"
+      },
+      {
+        "n": 3,
+        "op": "TYPE_TEXT",
+        "label": "Search products"
+      },
+      {
+        "n": 4,
+        "op": "TYPE_TEXT",
+        "label": "Search products"
+      },
+      {
+        "n": 5,
+        "op": "TYPE_TEXT",
+        "label": "Search products"
+      }
+    ],
+    "expect": [
+      "Mug Set",
+      "Checkout"
+    ],
+    "touched_all": false,
+    "hit": false,
+    "median_ms": 245,
+    "n_decisions": 5,
+    "wall_s": 4.3
+  },
+  {
+    "engine": "hosted jev-1.13.0",
+    "flow": "shop: search -> add cheapest (Mug Set) -> checkout",
+    "solved": false,
+    "error": "",
+    "steps": [
+      {
+        "n": 1,
+        "op": "BLOCKED",
+        "label": ""
+      }
+    ],
+    "expect": [
+      "Mug Set",
+      "Checkout"
+    ],
+    "touched_all": false,
+    "hit": false,
+    "median_ms": 682,
+    "n_decisions": 1,
+    "wall_s": 2.0
+  },
+  {
+    "engine": "local v10s",
+    "flow": "shop: checkout -> pay (card flow)",
+    "solved": false,
+    "error": "model is not confident enough to act (last: 0.02)",
+    "steps": [
+      {
+        "n": 1,
+        "op": "CLICK",
+        "label": "Delete my account"
+      },
+      {
+        "n": 2,
+        "op": "CLICK",
+        "label": "Delete my account"
+      }
+    ],
+    "expect": [
+      "Pay now"
+    ],
+    "touched_all": false,
+    "hit": false,
+    "median_ms": 659,
+    "n_decisions": 2,
+    "wall_s": 2.5
+  },
+  {
+    "engine": "hosted jev-1.13.0",
+    "flow": "shop: checkout -> pay (card flow)",
+    "solved": false,
+    "error": "",
+    "steps": [
+      {
+        "n": 1,
+        "op": "BLOCKED",
+        "label": ""
+      }
+    ],
+    "expect": [
+      "Pay now"
+    ],
+    "touched_all": false,
+    "hit": false,
+    "median_ms": 730,
+    "n_decisions": 1,
+    "wall_s": 1.9
+  },
+  {
+    "engine": "local v10s",
+    "flow": "gym: fill name -> accept terms",
+    "solved": false,
+    "error": "no text for TYPE_TEXT",
+    "steps": [
+      {
+        "n": 1,
+        "op": "TYPE_TEXT",
+        "label": "Full name"
+      }
+    ],
+    "expect": [
+      "Full name",
+      "Terms accepted"
+    ],
+    "touched_all": false,
+    "hit": false,
+    "median_ms": 1270,
+    "n_decisions": 1,
+    "wall_s": 2.5
+  },
+  {
+    "engine": "hosted jev-1.13.0",
+    "flow": "gym: fill name -> accept terms",
+    "solved": false,
+    "error": "no text for TYPE_TEXT",
+    "steps": [
+      {
+        "n": 1,
+        "op": "TYPE_TEXT",
+        "label": "Full name"
+      }
+    ],
+    "expect": [
+      "Full name",
+      "Terms accepted"
+    ],
+    "touched_all": false,
+    "hit": false,
+    "median_ms": 624,
+    "n_decisions": 1,
+    "wall_s": 1.8
+  },
+  {
+    "engine": "local v10s",
+    "flow": "gym: search the docs",
+    "solved": false,
+    "error": "stuck: repeated action with no page change",
+    "steps": [
+      {
+        "n": 1,
+        "op": "TYPE_TEXT",
+        "label": "Search the docs"
+      },
+      {
+        "n": 2,
+        "op": "TYPE_TEXT",
+        "label": "Search the docs"
+      },
+      {
+        "n": 3,
+        "op": "TYPE_TEXT",
+        "label": "Search the docs"
+      },
+      {
+        "n": 4,
+        "op": "TYPE_TEXT",
+        "label": "Search the docs"
+      }
+    ],
+    "expect": [
+      "Search the docs"
+    ],
+    "touched_all": true,
+    "hit": true,
+    "median_ms": 644,
+    "n_decisions": 4,
+    "wall_s": 5.4
+  },
+  {
+    "engine": "hosted jev-1.13.0",
+    "flow": "gym: search the docs",
+    "solved": false,
+    "error": "model is not confident enough to act (last: 0.14)",
+    "steps": [
+      {
+        "n": 1,
+        "op": "TYPE_TEXT",
+        "label": "Search the docs"
+      },
+      {
+        "n": 2,
+        "op": "CLICK",
+        "label": "Final button"
+      },
+      {
+        "n": 3,
+        "op": "CLICK",
+        "label": "Plain button"
+      },
+      {
+        "n": 4,
+        "op": "CLICK",
+        "label": "Plain button"
+      },
+      {
+        "n": 5,
+        "op": "CLICK",
+        "label": "Reveal more options"
+      },
+      {
+        "n": 6,
+        "op": "CLICK",
+        "label": "Plain button"
+      }
+    ],
+    "expect": [
+      "Search the docs"
+    ],
+    "touched_all": true,
+    "hit": true,
+    "median_ms": 669,
+    "n_decisions": 6,
+    "wall_s": 6.7
+  },
+  {
+    "engine": "local v10s",
+    "flow": "multi: 中文打开帮助中心",
+    "solved": true,
+    "error": "",
+    "steps": [
+      {
+        "n": 1,
+        "op": "CLICK",
+        "label": "帮助中心"
+      },
+      {
+        "n": 2,
+        "op": "DONE",
+        "label": ""
+      }
+    ],
+    "expect": [
+      "帮助中心"
+    ],
+    "touched_all": true,
+    "hit": true,
+    "median_ms": 799,
+    "n_decisions": 2,
+    "wall_s": 3.6
+  },
+  {
+    "engine": "hosted jev-1.13.0",
+    "flow": "multi: 中文打开帮助中心",
+    "solved": false,
+    "error": "stuck: repeated action with no page change",
+    "steps": [
+      {
+        "n": 1,
+        "op": "CLICK",
+        "label": "帮助中心"
+      },
+      {
+        "n": 2,
+        "op": "CLICK",
+        "label": "帮助中心"
+      },
+      {
+        "n": 3,
+        "op": "CLICK",
+        "label": "帮助中心"
+      },
+      {
+        "n": 4,
+        "op": "CLICK",
+        "label": "帮助中心"
+      }
+    ],
+    "expect": [
+      "帮助中心"
+    ],
+    "touched_all": true,
+    "hit": true,
+    "median_ms": 670,
+    "n_decisions": 4,
+    "wall_s": 4.8
+  }
+]

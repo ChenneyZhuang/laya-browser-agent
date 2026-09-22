@@ -235,7 +235,16 @@ class PlaywrightDriver(_BaseDriver):
             return {"ok": False, "detail": f"{type(error).__name__}: {str(error)[:120]}"}
         # A click can trigger navigation. Let it land before anyone reads the DOM again.
         self._settle()
-        signature = f"{self._page.url}|{self._page.title()}"
+        # The page "changed" if URL/title moved OR the interactive surface moved:
+        # SPAs and dynamic panels reveal content without touching location. A
+        # click that visibly changed the DOM is progress even when the URL is not.
+        dom_sig = self._page.evaluate(
+            "() => JSON.stringify([document.visibilityState,"
+            " Array.from(document.querySelectorAll('button, a, input, select, textarea'))"
+            ".filter(e => e.offsetParent !== null).length,"
+            " (document.body ? document.body.innerText.length : 0)])"
+        )
+        signature = f"{self._page.url}|{self._page.title()}|{dom_sig}"
         changed = signature != getattr(self, "_last_url_signature", None)
         self._last_url_signature = signature
         return {"ok": True, "detail": "ok", "page_changed": changed}
@@ -400,7 +409,14 @@ class CDPDriver(_BaseDriver):
             return {"ok": False, "detail": f"{type(error).__name__}: {str(error)[:120]}"}
         import time
         time.sleep(0.25)
-        signature = f"{self._eval('location.href')}|{self._eval('document.title')}"
+        # Same SPA-aware signature as the Playwright driver: a dynamic panel that
+        # reveals content without navigating is still progress.
+        dom_sig = self._eval(
+            "JSON.stringify([Array.from(document.querySelectorAll('button, a, input, select, textarea'))"
+            ".filter(e => e.offsetParent !== null).length,"
+            " (document.body ? document.body.innerText.length : 0)])"
+        )
+        signature = f"{self._eval('location.href')}|{self._eval('document.title')}|{dom_sig}"
         changed = signature != getattr(self, "_last_url_signature", None)
         self._last_url_signature = signature
         return {"ok": True, "detail": "ok", "page_changed": changed}

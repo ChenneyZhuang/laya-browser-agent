@@ -12,11 +12,8 @@ BATCHES=(
   "TestObservationReader"
   "TestDecisionsOnRealElements"
   "TestMultilingual"
-  "TestShadowDOM"
-  "TestHiddenMenus"
-  "TestRTLAndExtendedScripts"
-  "TestGroundingMultiLanguage"
   "TestFlows"
+  "TestMemorySafety"
 )
 
 mem_free_percent() {

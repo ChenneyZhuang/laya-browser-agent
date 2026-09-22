@@ -56,6 +56,21 @@ with PlaywrightDriver(start_url="https://en.wikipedia.org/wiki/Main_Page") as dr
     print(run.stopped, run.summary()["median_decision_ms"], "ms/决策")
 ```
 
+### 与官方 Jev 的正面对决：实测数据
+
+`examples/diagnostics/jev_head_to_head.py`（单步）与 `jev_flow_h2h.py`（多步完整流程）把同样的任务分别喂给本地 Laya v10s 与官方 jev-1.13.0：
+
+| 单步零上下文（12 题 / 6 语言） | 本地 v10s | 官方 Jev |
+|---|---|---|
+| 严格元素命中 | 4/12 | **8/12** |
+| 跨语言目标 | 1/6 | **5/6** |
+| 中位延迟 | **618ms** | 716ms |
+| 平均置信度 | 0.90（过自信）| 0.81 |
+
+多步流程：**两个引擎目前都无法独立完成脚本化购物流程**——难点在"输入搜索词之后、结果出现之前"的状态；本地 v10s 在商品可见时仍会重复点击 Search（p=0.84），官方 Jev 会答 BLOCKED 或以 0.45 的低置信度选对元素。本地 v10s 完整走通了中文导航流程（帮助中心→DONE），官方 Jev 到达同元素但未发 DONE。
+
+**结论**：要开箱准确率（尤其跨语言）→ 官方 Jev 每次约 $0.000017；要隐私/离线/免费大量调用 → 本地版延迟相当、置信度校准更需打磨，且需要 harness 循环配合才能进入其训练场景。
+
 ### 已对官方 Jev API 实测验证
 
 本项目的 `systemone` 方言已于 2026-09-22 对 TypeSafe 生产端点（`api.typesafe.ai/v1/systemone`，模型 `jev-1.13.0`）完整实测。注意：**每种题型都必须带 `criteria` 字段**——`choice` 的 `criteria` 是「选项 → 评分说明」的映射（不是字符串），`score` 的是数组。同一份请求体把 URL 换成本地 `localdecide serve` 即可用本地 Laya 模型得到相同结构的回答，切换只需改一个 base URL。
