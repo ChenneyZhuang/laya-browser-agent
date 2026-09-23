@@ -7,7 +7,7 @@
 [![tests](https://github.com/ChenneyZhuang/laya-browser-agent/actions/workflows/tests.yml/badge.svg)](https://github.com/ChenneyZhuang/laya-browser-agent/actions/workflows/tests.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 ![GitHub release](https://img.shields.io/github/v/tag/ChenneyZhuang/laya-browser-agent)
-![Python](https://img.shields.io/badge/python-3.9%2B-blue)
+![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![Runs on](https://img.shields.io/badge/runs%20on-Apple%20Silicon%20%7C%20CUDA%20%7C%20CPU-black)
 
 A local, open-weight alternative to [TypeSafe Jev](https://docs.typesafe.ai) for the
@@ -56,7 +56,7 @@ Measured on an M4 MacBook Air, 16 GB (see [Benchmarks](#benchmarks)):
 | Where it runs | TypeSafe's cloud | anywhere PyTorch runs | **your machine** — MLX on Apple Silicon, PyTorch elsewhere |
 | Wire format | `POST /v1/systemone` | same contract | speaks it too (`POST /v1/systemone`) |
 | Cost | $0.042/M input tokens | free | free |
-| Browser harness | [jev-ultrafast](https://github.com/browser-use/jev-ultrafast) (12.6k★) | — | **included**: loop, drivers, guards, skills |
+| Browser harness | [jev-ultrafast](https://github.com/browser-use/jev-ultrafast) (18.8k★) | — | **included**: loop, drivers, guards, skills |
 | Page leaves your machine | yes | no | **no** |
 
 ### Verified against the real Jev API

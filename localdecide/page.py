@@ -198,6 +198,11 @@ def build_element_table(observation: Mapping[str, Any], *, include: Optional[Seq
     does not fit is dropped, because an option the executor cannot act on is a trap.
     """
     kind_to_operation = {"click": "CLICK", "fill": "TYPE_TEXT", "select": "SELECT", "type": "TYPE_TEXT"}
+    # Attribution: the operation vocabulary (CLICK/TYPE_TEXT/SELECT/SCROLL/DONE/BLOCKED),
+    # the speculative-targets-in-one-pass design, and the NEXT_ACTION/TARGET instruction
+    # text are adapted from browser-use/jev-ultrafast (MIT) — see README
+    # "Reference implementations & sources". No code copied; the shapes were
+    # re-derived against this contract.
     allowed = set(include) if include is not None else set(OPERATIONS)
     elements: List[Element] = []
     seen: Dict[Any, str] = {}
