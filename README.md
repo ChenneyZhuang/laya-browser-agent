@@ -40,10 +40,11 @@ Measured on an M4 MacBook Air, 16 GB (see [Benchmarks](#benchmarks)):
 
 | | |
 |---|---|
-| Decision latency | **10–30 ms** steady state, **~150 ms** with a 60-element page |
+| Decision latency | **10–30 ms** steady state, **~150 ms** with a 60-element page (upstream p50: 38 ms for 1 question) |
 | Throughput | **up to ~100 decisions/second** |
 | Cost | **$0.00** — no API, no metering |
 | Model size | 322 M params (~644 MB) on disk |
+| Calibration | upstream reports **ECE 0.030** across 13 task families (post-temperature-scaling) |
 | Page content sent to a server | **none** |
 
 ---
@@ -162,6 +163,15 @@ The phishing row deserves a stare: local v10s scored the classic "妈妈，我�
 **Browser edge cases** (`jev_edge_h2h.py` — goals where restraint is the right answer, 9 cases): local 4/9, hosted 5/9, and they fail in *opposite* directions. Local v10s is a fire-and-act model: it clicks "Delete my account" (p=0.93) when asked to delete *the entire website*, unticks an already-unticked checkbox, and clicks a disabled button — near-certain confidence every time. Hosted Jev blocks the impossible goals but also over-blocks legitimate ones (missed "Delete my account" as a real goal). Neither engine has a trustworthy notion of "this goal cannot be done here" yet; the harness's own guards (disabled-element checks, confirmation gates) are what catch these today.
 
 Practical summary across all four batteries: use hosted Jev when accuracy and safety calibration matter and per-call cost is fine; use local v10s when latency (10-20x faster), privacy, or free-at-volume matters, and let the harness guards compensate for its overconfidence. Fine-tuning data for the weakest axes (Chinese grounding, phishing, restraint) is exactly what the training recipe in this repo's diagnostics produces.
+
+The phishing gap is a data problem, not an architecture ceiling: a September 2026
+arXiv study ([2609.23959](https://arxiv.org/abs/2609.23959)) LoRA-tunes a 4B model
+to output a single calibrated P(scam) in one forward pass and reaches AUROC .974
+with calibration error .052 on scam-call screening — the same readout this repo
+runs, better data. And Laya's upstream publishes the calibration numbers to aim
+for: [accuracy 0.753 at ECE 0.030](https://huggingface.co/convaiinnovations/laya)
+across 13 task families, which the v10s browser checkpoint does not inherit on
+text outside its browser training distribution (see the pool/SMS rows above).
 
 If you have read about Jev's "System One" model and want the same idea — typed,
 calibrated decisions instead of generated text — running locally for your browser
@@ -703,6 +713,8 @@ stated explicitly, because attribution matters more than a link dump.
 |---|---|
 | [Nandakishor Mukkunnoth — *I Built Non-Autoregressive Decision Models with RL a Year Ago*](https://laya.convaiinnovations.com/) | The RLCD framing, the three primitives, and the honest limitations (options beyond ~20 degrade; zero-shot is weak; temperature calibration needed). |
 | [Laya BENCHMARKS.md](https://github.com/NandhaKishorM/laya/blob/main/BENCHMARKS.md) | The exact per-language and per-task numbers quoted in the caveats, including the Khmer/Armenian/Hebrew confidence failures that motivate confidence-gating being unreliable on its own. |
+| [arXiv 2609.23959 — *Open-Jev Judgments on CallScreenBench*](https://arxiv.org/abs/2609.23959) (Sep 2026) | Independent peer evidence that the typed-decision readout works for safety screening when the data is right: AUROC .974, calibration error .052, 64.5 ms/decision on a consumer GPU. Grounds the phishing claims in this README's text battery. |
+| [arXiv 2402.09769 — *Learning Using a Single Forward Pass*](https://arxiv.org/abs/2402.09769) | The non-autoregressive, single-forward-pass decision lineage this model class descends from. |
 | [jev.guide — Browser Use + Jev](https://jev.guide/en/explore), [madewithjev.com](https://madewithjev.com/categories/agents-and-browsers) | The survey of the ~60 independent browser/computer-use projects built on this model class — the evidence that this is a real pattern and not a single demo. |
 
 **Nothing here is a fork.** The models are dependencies. The design ideas are

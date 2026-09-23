@@ -80,6 +80,11 @@ Si has leído sobre el modelo "System One" de Jev y quieres la misma idea — de
 
 Detalles completos en el [README en inglés](README.md).
 
+### Respaldo en la literatura
+
+- [arXiv 2609.23959](https://arxiv.org/abs/2609.23959) (sep 2026): evidencia independiente de pares — el mismo mecanismo de decisión tipada aplicado a cribado de fraude alcanza AUROC .974, error de calibración .052 y 64.5 ms/decisión en una GPU de consumo cuando los datos son adecuados. La debilidad de phishing vista en la batería de texto es un problema de datos, no de arquitectura.
+- El upstream de Laya publica su calibración: **accuracy 0.753 @ ECE 0.030** en 13 familias de tareas (tras escalado de temperatura). El checkpoint v10s no hereda ese nivel en texto fuera de su distribución de entrenamiento (ver filas de pool/SMS arriba).
+
 ## Licencia
 
 Apache-2.0
