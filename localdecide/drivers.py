@@ -329,6 +329,19 @@ class _PointHandle:
 
     def fill(self, text: str, timeout: int = 5000) -> None:
         self.page.mouse.click(self.x, self.y)
+        # Actionability guard (per Playwright's auto-wait philosophy): typing is only
+        # meaningful into an editable target. If the click landed on anything else
+        # (a label, the body, a link), say so instead of spraying keystrokes.
+        tag = self.page.evaluate(
+            "([x, y]) => { const el = document.elementFromPoint(x, y);"
+            " if (!el) return null;"
+            " const t = el.tagName.toLowerCase();"
+            " return (t === 'input' || t === 'textarea' || el.isContentEditable) ? t : null; }",
+            [self.x, self.y],
+        )
+        if tag is None:
+            from playwright.sync_api import Error as PlaywrightError
+            raise PlaywrightError("fill target is not an editable element (input/textarea/contenteditable)")
         self.page.keyboard.press("Meta+A" if self.page.evaluate("navigator.platform.includes('Mac')") else "Control+A")
         self.page.keyboard.type(text)
 

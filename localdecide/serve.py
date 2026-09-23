@@ -103,13 +103,42 @@ class Handler(BaseHTTPRequestHandler):
     def _send(self, code: int, body: Dict[str, Any]) -> None:
         data = json.dumps(body, ensure_ascii=False, default=str).encode("utf-8")
         self.send_response(code)
+        # CORS: browser extensions and local web consoles call this service from
+        # origins like chrome-extension://... — the same convention Ollama uses for
+        # a localhost-only tool service. The server binds to 127.0.0.1 by default.
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        if code == 204:  # no content: no body, no Content-Type/Length
+            self.end_headers()
+            return
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)
 
+    def do_OPTIONS(self) -> None:  # noqa: N802
+        # CORS preflight — headers go out via _send.
+        self._send(204, {})
+
+    def do_HEAD(self) -> None:  # noqa: N802
+        # Health checkers often probe with HEAD; answer without a body.
+        path = self.path.rstrip("/")
+        code = 200 if path in ("/healthz", "/", "/v1/models") else 404
+        self._send(code, {})
+
     def do_GET(self) -> None:  # noqa: N802
-        if self.path.rstrip("/") in ("/healthz", "/"):
+        path = self.path.rstrip("/")
+        if path == "/v1/models":
+            # TypeSafe-compatible model list (their /v1/models returns hosted Jev
+            # variants; here the served model is whichever local checkpoint loaded).
+            if not _State.backend_name:
+                _decider()  # force the backend load so the name is real, not ""
+            self._send(200, {"models": [{"name": _State.backend_name or "localdecide",
+                                         "description": "The local decision model behind this service",
+                                         "release_date": None}]})
+            return
+        if path in ("/healthz", "/"):
             try:
                 decider = _decider()
                 self._send(200, {"ok": True, "backend": _State.backend_name, "calls": _State.calls,

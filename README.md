@@ -395,7 +395,13 @@ localdecide serve --port 8791
 | `POST /v1/systemone` | TypeSafe Jev / Laya wire format | anything already written against Jev's HTTP API — change one base URL |
 | `POST /v1/decide` | `{state, questions}` | your own code, minimal ceremony |
 | `POST /v1/table` | `{goal, observation}` → chosen index | browser tooling that has an observation and wants a decision |
+| `GET /v1/models` | served model list (TypeSafe-compatible shape) | tooling that lists models |
 | `GET /healthz` | liveness + active backend | ops |
+
+The server answers CORS preflights (`OPTIONS`) and sends
+`Access-Control-Allow-Origin: *` on everything, so browser extensions and local
+web consoles can call it directly — the same convention Ollama uses for a
+localhost-only tool service. It binds to `127.0.0.1` unless told otherwise.
 
 Because the `systemone` dialect is the same contract Jev and Laya speak, projects
 that were built for those APIs work against a local model by setting a base URL —

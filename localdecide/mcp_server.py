@@ -31,8 +31,12 @@ from typing import Any, Dict
 from .decider import Decider
 from .page import build_element_table, table_to_questions
 
-PROTOCOL_VERSION = "2024-11-05"
-SERVER_INFO = {"name": "localdecide", "version": "0.1.0"}
+# Protocol versions this server speaks, newest first. Per the MCP lifecycle
+# spec (2025-06-18 §Version Negotiation): if the client requests a version we
+# support, respond with the same one; otherwise respond with our latest.
+SUPPORTED_PROTOCOL_VERSIONS = ["2025-06-18", "2024-11-05"]
+PROTOCOL_VERSION = SUPPORTED_PROTOCOL_VERSIONS[0]
+SERVER_INFO = {"name": "localdecide", "version": "0.2.0"}
 
 TOOLS = [
     {
@@ -107,8 +111,11 @@ class _Session:
         request_id = message.get("id")
         try:
             if method == "initialize":
+                requested = str(message.get("params", {}).get("protocolVersion", "") or "")
+                # Spec: same version if we support it, else our latest.
+                version = requested if requested in SUPPORTED_PROTOCOL_VERSIONS else PROTOCOL_VERSION
                 return self._ok(request_id, {
-                    "protocolVersion": PROTOCOL_VERSION,
+                    "protocolVersion": version,
                     "capabilities": {"tools": {}},
                     "serverInfo": SERVER_INFO,
                 })
