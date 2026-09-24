@@ -3,6 +3,33 @@
 All notable changes to this project are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/); versioning follows [SemVer](https://semver.org/).
 
+## [0.2.3] - 2026-09-24
+
+### Fixed
+- **CORS preflight was broken in 0.2.0–0.2.2**: `do_OPTIONS` was defined twice
+  in `serve.py`; the second definition silently overrode the CORS-correct
+  first one, so `OPTIONS` responses carried no `Access-Control-*` headers and
+  browser-based clients (extensions, local web consoles) failed at preflight.
+  Now a single handler routing through `_send`. Found by the new HTTP test
+  suite — hand-testing had only checked the 204 status, not the headers.
+- Version drift: three different versions lived in the tree (pyproject,
+  `mcp_server.SERVER_INFO`, `__init__.__version__`). Both constants now read
+  the installed package metadata; one source of truth.
+- `goal_tokens` was public API by usage (tests, diagnostics) but missing from
+  `__all__`; now exported.
+- 32 dead imports removed repo-wide; loop-variable closures in two
+  diagnostics bound explicitly (ruff `B023`).
+
+### Added
+- `tests/test_serve.py` — 14 tests over the HTTP surface: CORS on every
+  response, preflight headers, routing, body limits, error codes. Runs with
+  an injected fake backend, no checkpoint needed.
+- `tests/test_mcp.py` — 13 tests over the MCP surface: spec version
+  negotiation (current, legacy, unknown), tools list/call, error paths.
+- `ruff` wired into `pyproject.toml` (correctness rules only: `F`, `E9`,
+  `B023`, `RUF100`) and into CI.
+- Coverage: `serve.py` 0→83%, `mcp_server.py` 0→81%, project total 50→65%.
+
 ## [0.2.2] - 2026-09-24
 
 ### Fixed
