@@ -6,7 +6,8 @@
 # the peak low, and the memory check aborts before the machine is under real pressure.
 
 set -u
-cd /Volumes/SSD/localdecide || exit 1
+# Repo root = wherever this script lives (works on any machine, not just the author's Mac).
+cd "$(dirname "$0")/.." || exit 1
 
 BATCHES=(
   "TestObservationReader"
