@@ -28,7 +28,7 @@ API = "https://api.typesafe.ai/v1/systemone"
 KEY = os.environ.get("TYPESAFE_API_KEY", "")
 MODEL = "jev-latest"
 
-from localdecide import Decider, choice, noul, score  # noqa: E402
+from localdecide import Decider, choice, noul, score
 
 # ── task 1: pool-lead triage (English) ───────────────────────────────────────
 POOL_CASES = [

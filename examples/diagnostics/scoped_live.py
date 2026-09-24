@@ -1,6 +1,5 @@
 
-import time
-from localdecide import BrowserDecider, Decider, Scope
+from localdecide import Scope
 from localdecide.drivers import PlaywrightDriver
 
 GOALS = [

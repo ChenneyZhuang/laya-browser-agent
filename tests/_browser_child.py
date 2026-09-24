@@ -81,7 +81,7 @@ def _run(request: Dict[str, Any]) -> Dict[str, Any]:
         # {label_substring: text}
         mapping = request["text_for"]
 
-        def text_provider(goal, element):  # noqa: F811
+        def text_provider(goal, element):
             for key, value in mapping.items():
                 if key.lower() in (element.label or "").lower():
                     return value
@@ -106,7 +106,7 @@ def main() -> int:
     try:
         result = _run(request) if action == "run" else _observe(request)
         result["ok"] = True
-    except Exception as error:  # noqa: BLE001 - the parent needs the reason, not a traceback
+    except Exception as error:
         import traceback
         result = {"ok": False, "error": f"{type(error).__name__}: {error}",
                   "traceback": traceback.format_exc()[-1500:]}

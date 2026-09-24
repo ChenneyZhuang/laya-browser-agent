@@ -46,3 +46,18 @@ packages = ["localdecide", "localdecide.backends"]
 
 [tool.setuptools.package-data]
 localdecide = ["py.typed"]
+
+[tool.ruff]
+line-length = 120
+exclude = [".venv"]
+
+[tool.ruff.lint]
+# Correctness + hygiene only: dead imports, redefinitions, shadowed loop
+# variables. Style upgrades (UP*/I001) stay off so the diff noise never
+# hides a real finding.
+select = ["F", "E9", "B023", "RUF100"]
+
+[tool.ruff.lint.per-file-ignores]
+# diagnostics and tests may keep illustrative imports while being edited
+"examples/diagnostics/*.py" = ["F401", "F841"]
+"tests/*.py" = ["F401", "F841"]

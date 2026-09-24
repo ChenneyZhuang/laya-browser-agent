@@ -16,12 +16,11 @@ The loop is driver-agnostic on purpose: pass any object with
 
 from __future__ import annotations
 
-import time
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Protocol
 
-from .decider import Decision, Decider, choice
-from .page import ElementTable, build_element_table, table_to_questions
+from .decider import Decider
+from .page import build_element_table, table_to_questions
 from .scope import Scope
 
 

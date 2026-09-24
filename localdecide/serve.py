@@ -117,17 +117,13 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
-    def do_OPTIONS(self) -> None:  # noqa: N802
-        # CORS preflight — headers go out via _send.
-        self._send(204, {})
-
-    def do_HEAD(self) -> None:  # noqa: N802
+    def do_HEAD(self) -> None:
         # Health checkers often probe with HEAD; answer without a body.
         path = self.path.rstrip("/")
         code = 200 if path in ("/healthz", "/", "/v1/models") else 404
         self._send(code, {})
 
-    def do_GET(self) -> None:  # noqa: N802
+    def do_GET(self) -> None:
         path = self.path.rstrip("/")
         if path == "/v1/models":
             # TypeSafe-compatible model list (their /v1/models returns hosted Jev
@@ -149,7 +145,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         self._send(404, {"error": "not found"})
 
-    def do_POST(self) -> None:  # noqa: N802
+    def do_POST(self) -> None:
         path = self.path.rstrip("/")
         try:
             length = int(self.headers.get("Content-Length", 0) or 0)
@@ -191,11 +187,10 @@ class Handler(BaseHTTPRequestHandler):
             _State.calls += 1
         self._send(200, body)
 
-    def do_OPTIONS(self) -> None:  # noqa: N802
-        self.send_response(204)
-        self.send_header("Allow", "GET, POST, OPTIONS")
-        self.send_header("Content-Length", "0")
-        self.end_headers()
+    def do_OPTIONS(self) -> None:
+        # CORS preflight: the Access-Control-* headers are emitted by _send,
+        # which is what a browser's preflight request actually validates.
+        self._send(204, {})
 
 
 def serve(host: str = "127.0.0.1", port: int = 8791) -> None:

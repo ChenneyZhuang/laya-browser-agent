@@ -9,9 +9,9 @@ from __future__ import annotations
 
 import unittest
 
-from test_live import FIXTURES, decider, observe_fixture
+from test_live import FIXTURES, observe_fixture
 
-from localdecide import Scope, build_element_table, table_to_questions
+from localdecide import build_element_table, table_to_questions
 
 
 class TestShadowDOM(unittest.TestCase):

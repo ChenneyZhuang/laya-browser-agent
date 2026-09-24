@@ -12,8 +12,7 @@ from typing import Any, Dict
 
 from localdecide import BrowserDecider, Decider, Scope, choice, goal_tokens, noul, score
 from localdecide.decider import DecisionError
-from localdecide.loop import Step
-from localdecide.page import Element, ElementTable, build_element_table, table_to_questions
+from localdecide.page import build_element_table, table_to_questions
 
 
 class TestScope(unittest.TestCase):

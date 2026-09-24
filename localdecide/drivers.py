@@ -418,7 +418,7 @@ class CDPDriver(_BaseDriver):
                     self._call("Input.insertText", text=text)
             else:
                 return {"ok": False, "detail": f"unsupported {operation}"}
-        except Exception as error:  # noqa: BLE001 - driver failures are data, not crashes
+        except Exception as error:
             return {"ok": False, "detail": f"{type(error).__name__}: {str(error)[:120]}"}
         import time
         time.sleep(0.25)

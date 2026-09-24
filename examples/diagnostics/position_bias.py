@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import json
 import random
-import statistics
 
 from localdecide import Decider, Scope, build_element_table, table_to_questions
 from localdecide.drivers import PlaywrightDriver

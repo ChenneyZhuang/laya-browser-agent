@@ -52,6 +52,12 @@ jobs:
         shell: python
       - name: Contract tests
         run: python -m pytest tests/test_contract.py -q -p no:cacheprovider
+      - name: HTTP service + MCP tests (no checkpoint needed)
+        run: python -m pytest tests/test_serve.py tests/test_mcp.py -q -p no:cacheprovider
+      - name: Lint (correctness rules)
+        run: |
+          pip install ruff
+          ruff check .
       - name: Memory-safety rules
         run: python -m pytest tests/test_live.py::TestMemorySafety -q -p no:cacheprovider
 

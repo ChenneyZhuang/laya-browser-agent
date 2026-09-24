@@ -9,7 +9,7 @@ renders "Cart: 0 item(s) · Step 1", and its field carries a `current_value` of 
 the model as "this step may already be under way". This script isolates the variable.
 """
 
-from localdecide import Decider, Scope, build_element_table
+from localdecide import Decider, build_element_table
 from localdecide.drivers import PlaywrightDriver
 
 import pathlib as _pl

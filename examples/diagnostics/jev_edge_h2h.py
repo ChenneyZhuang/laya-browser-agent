@@ -26,7 +26,7 @@ API = "https://api.typesafe.ai/v1/systemone"
 KEY = os.environ.get("TYPESAFE_API_KEY", "")
 MODEL = "jev-latest"
 
-from localdecide import build_element_table, table_to_questions  # noqa: E402
+from localdecide import build_element_table, table_to_questions
 
 
 def observe(fixture: str) -> dict:

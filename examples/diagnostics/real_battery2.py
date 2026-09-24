@@ -12,9 +12,8 @@ Run:  .venv/bin/python examples/diagnostics/real_battery2.py
 
 from __future__ import annotations
 
-import time
 
-from localdecide import BrowserDecider, Decider, Scope, build_element_table, table_to_questions
+from localdecide import BrowserDecider, Decider, Scope
 from localdecide.drivers import PlaywrightDriver
 
 # (url, goal, success check on the resulting page: (url_contains | None, title_contains | None))
@@ -71,8 +70,9 @@ for url, goal, (url_check, title_check) in CASES:
     class _Recording:
         """Wraps the driver to capture the landing page state after each execute."""
 
-        def __init__(self, inner):
+        def __init__(self, inner, landing):
             self._inner = inner
+            self._landing = landing  # bind the dict to the instance, not the loop scope
 
         def observe(self):
             return self._inner.observe()
@@ -80,8 +80,8 @@ for url, goal, (url_check, title_check) in CASES:
         def execute(self, operation, element, text=None):
             result = self._inner.execute(operation, element, text)
             try:
-                landed["url"] = self._inner._page.url
-                landed["title"] = self._inner._page.title()
+                self._landing["url"] = self._inner._page.url
+                self._landing["title"] = self._inner._page.title()
             except Exception:
                 pass
             return result
@@ -89,7 +89,7 @@ for url, goal, (url_check, title_check) in CASES:
         def close(self):
             self._inner.close()
 
-    driver = _Recording(raw_driver)
+    driver = _Recording(raw_driver, landed)
     try:
         run = BrowserDecider(decider=decider, max_steps=2, scope=Scope(max_elements=20),
                              text_provider=text_for).run(driver, goal)

@@ -37,8 +37,7 @@ def _require_live() -> bool:
 LIVE = _require_live()
 
 if LIVE:
-    from localdecide import BrowserDecider, Decider, Scope, build_element_table, table_to_questions
-    from localdecide.drivers import PlaywrightDriver
+    from localdecide import Decider, Scope, build_element_table, table_to_questions
 
     _DECIDER = None
 

@@ -10,7 +10,6 @@ No dependencies, standard library only, safe to run repeatedly (idempotent).
 from __future__ import annotations
 
 import argparse
-import os
 import shutil
 from pathlib import Path
 

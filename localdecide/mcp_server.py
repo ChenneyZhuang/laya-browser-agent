@@ -36,7 +36,15 @@ from .page import build_element_table, table_to_questions
 # support, respond with the same one; otherwise respond with our latest.
 SUPPORTED_PROTOCOL_VERSIONS = ["2025-06-18", "2024-11-05"]
 PROTOCOL_VERSION = SUPPORTED_PROTOCOL_VERSIONS[0]
-SERVER_INFO = {"name": "localdecide", "version": "0.2.0"}
+
+
+def _package_version() -> str:
+    """Same single source as localdecide.__version__ — metadata, not a constant."""
+    from . import __version__
+    return __version__
+
+
+SERVER_INFO = {"name": "localdecide", "version": _package_version()}
 
 TOOLS = [
     {
@@ -128,7 +136,7 @@ class _Session:
             if method == "ping":
                 return self._ok(request_id, {})
             return self._error(request_id, -32601, f"method not found: {method}")
-        except Exception as error:  # noqa: BLE001 - the client needs the reason
+        except Exception as error:
             return self._error(request_id, -32603, f"{type(error).__name__}: {error}")
 
     def _call_tool(self, params: Dict[str, Any]) -> Dict[str, Any]:

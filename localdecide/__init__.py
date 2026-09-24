@@ -33,7 +33,25 @@ from .page import (
 from .grounding import ground_goal, overlap_score, same_script, script_of
 from .scope import Scope, full_page_scope, goal_tokens
 
-__version__ = "0.1.0"
+
+def _version() -> str:
+    """Single source of truth: the installed package metadata (set from pyproject).
+
+    Falls back to 0.0.0.dev0 for a source checkout that was never installed —
+    the value is informational, and a wrong constant here is worse than an
+    honest "unknown".
+    """
+    try:
+        from importlib.metadata import PackageNotFoundError, version
+    except ImportError:  # pragma: no cover - stdlib on every supported Python
+        return "0.0.0.dev0"
+    try:
+        return version("laya-browser-agent")
+    except PackageNotFoundError:  # pragma: no cover - plain source checkout
+        return "0.0.0.dev0"
+
+
+__version__ = _version()
 __all__ = [
     # deciding
     "Decider", "Decision", "DecisionError", "Answers", "Question", "choice", "score", "noul",
@@ -45,5 +63,7 @@ __all__ = [
     "Scope", "full_page_scope",
     # cross-language grounding
     "ground_goal", "overlap_score", "same_script", "script_of",
+    # goal tokenization
+    "goal_tokens",
     "__version__",
 ]
