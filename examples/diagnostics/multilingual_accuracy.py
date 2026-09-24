@@ -19,7 +19,12 @@ import json
 from localdecide import Decider, Scope, build_element_table, table_to_questions
 from localdecide.drivers import PlaywrightDriver
 
-URL = "file:///Volumes/SSD/localdecide/tests/fixtures/multilingual.html"
+import pathlib as _pl
+_REPO = _pl.Path(__file__).resolve().parents[2]
+def _fx(name: str) -> str:
+    return (_REPO / "tests" / "fixtures" / name).as_uri()
+
+URL = _fx("multilingual.html")
 
 # (goal, expected label substring, language tag)
 CASES = [

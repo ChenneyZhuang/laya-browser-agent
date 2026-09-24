@@ -14,7 +14,12 @@ from localdecide import Decider, Scope, build_element_table
 from localdecide.drivers import PlaywrightDriver
 from localdecide.page import NEXT_ACTION_RULES, TARGET_RULES
 
-URL = "file:///Volumes/SSD/localdecide/tests/fixtures/flow_shop.html"
+import pathlib as _pl
+_REPO = _pl.Path(__file__).resolve().parents[2]
+def _fx(name: str) -> str:
+    return (_REPO / "tests" / "fixtures" / name).as_uri()
+
+URL = _fx("flow_shop.html")
 GOAL = "Search products for 'kettle' and then show the results."
 
 driver = PlaywrightDriver(headless=True, start_url=URL)

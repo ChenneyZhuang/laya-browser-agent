@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "laya-browser-agent"
-version = "0.2.0"
+version = "0.2.2"
 description = "Browser agent decisions with Laya, the open System 1 model — a local, open-source alternative to TypeSafe Jev. No cloud, no API key, no screenshots."
 readme = "README.md"
 requires-python = ">=3.10"

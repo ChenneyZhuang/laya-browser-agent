@@ -33,3 +33,9 @@ models/
 *.log
 /tmp/
 CODEX_3080_FINETUNE_TASK.md
+# Local secrets (API keys) — never commit
+.env
+*.env.local
+
+# Local training/eval reports (belong to the finetune branch, not this repo)
+reports/

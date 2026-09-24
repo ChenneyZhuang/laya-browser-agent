@@ -1,10 +1,15 @@
 
 import sys
-sys.path.insert(0, "/Volumes/SSD/localdecide")
+sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parents[2]))
 from localdecide import Decider, Scope, build_element_table, table_to_questions
 from localdecide.drivers import PlaywrightDriver
 
-drv = PlaywrightDriver(headless=True, start_url="file:///Volumes/SSD/localdecide/tests/fixtures/element_gym.html")
+import pathlib as _pl
+_REPO = _pl.Path(__file__).resolve().parents[2]
+def _fx(name: str) -> str:
+    return (_REPO / "tests" / "fixtures" / name).as_uri()
+
+drv = PlaywrightDriver(headless=True, start_url=_fx("element_gym.html"))
 obs = drv.observe(); drv.close()
 GOAL = "Accept the terms by ticking 'Terms accepted'."
 table = build_element_table(Scope(max_elements=25).apply(obs, goal=GOAL))

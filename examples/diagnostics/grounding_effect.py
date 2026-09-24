@@ -9,7 +9,12 @@ from __future__ import annotations
 from localdecide import Decider, Scope, build_element_table, table_to_questions
 from localdecide.drivers import PlaywrightDriver
 
-URL = "file:///Volumes/SSD/localdecide/tests/fixtures/multilingual.html"
+import pathlib as _pl
+_REPO = _pl.Path(__file__).resolve().parents[2]
+def _fx(name: str) -> str:
+    return (_REPO / "tests" / "fixtures" / name).as_uri()
+
+URL = _fx("multilingual.html")
 
 CASES = [
     ("点击标着“登录”的按钮。", "登录"),

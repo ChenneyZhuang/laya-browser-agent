@@ -258,8 +258,15 @@ class TestDecisionsOnRealElements(unittest.TestCase):
         self.assertTrue(result.ok, result.error)
         assert result.answers is not None
         self.assertEqual(result.answers.choice("operation"), "SELECT")
-        option_key = result.answers.choice("select_option")
-        element = table.by_index()[result.answers.choice("select_target")]
+        # PR #1 contract: on a multi-dropdown page each field gets its own
+        # select_option_<index> question; fall back to the flat name when the
+        # page offers a single dropdown.
+        target_index = result.answers.choice("select_target")
+        option_question = (f"select_option_{target_index}"
+                           if f"select_option_{target_index}" in result.answers.raw
+                           else "select_option")
+        option_key = result.answers.choice(option_question)
+        element = table.by_index()[target_index]
         option = next(o for o in element.options if o["index"] == option_key)
         self.assertEqual(option["value"], "JP", f"chose option {option!r}")
 

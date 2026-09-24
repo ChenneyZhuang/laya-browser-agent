@@ -1,6 +1,6 @@
 
 import sys
-sys.path.insert(0, "/Volumes/SSD/localdecide")
+sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parents[2]))
 from localdecide import Decider, build_element_table
 
 GOAL = "Search products for 'kettle' and then show the results."

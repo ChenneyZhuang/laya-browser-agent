@@ -17,7 +17,12 @@ that mistake - which is why its numbers disagreed with the decision-level experi
 from localdecide import Decider, Scope, build_element_table, table_to_questions
 from localdecide.drivers import PlaywrightDriver
 
-FIXTURE = "file:///Volumes/SSD/localdecide/tests/fixtures/flow_shop.html"
+import pathlib as _pl
+_REPO = _pl.Path(__file__).resolve().parents[2]
+def _fx(name: str) -> str:
+    return (_REPO / "tests" / "fixtures" / name).as_uri()
+
+FIXTURE = _fx("flow_shop.html")
 GOAL = "Search products for 'kettle' and then show the results."
 
 driver = PlaywrightDriver(headless=True, start_url=FIXTURE)

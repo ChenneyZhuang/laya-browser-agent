@@ -1,9 +1,9 @@
 
 import sys
-sys.path.insert(0, "/Volumes/SSD/localdecide")
+sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parents[2]))
 from localdecide.drivers import PlaywrightDriver
 import pathlib
-FIX = pathlib.Path("/Volumes/SSD/localdecide/tests/fixtures")
+FIX = pathlib.Path(__file__).resolve().parents[2] / "tests" / "fixtures"
 d = PlaywrightDriver(headless=True, start_url=f"file://{FIX/'element_gym.html'}")
 obs = d.observe()
 labels = [a["label"] for a in obs["actions"]]

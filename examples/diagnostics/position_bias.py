@@ -21,16 +21,21 @@ import statistics
 from localdecide import Decider, Scope, build_element_table, table_to_questions
 from localdecide.drivers import PlaywrightDriver
 
+import pathlib as _pl
+_REPO = _pl.Path(__file__).resolve().parents[2]
+def _fx(name: str) -> str:
+    return (_REPO / "tests" / "fixtures" / name).as_uri()
+
 CASES = [
-    ("file:///Volumes/SSD/localdecide/tests/fixtures/element_gym.html",
+    (_fx("element_gym.html"),
      "Click the control labelled 'ARIA role=button'.", "ARIA role=button"),
-    ("file:///Volumes/SSD/localdecide/tests/fixtures/element_gym.html",
+    (_fx("element_gym.html"),
      "Click the 'Reveal more options' button.", "Reveal more options"),
-    ("file:///Volumes/SSD/localdecide/tests/fixtures/element_gym.html",
+    (_fx("element_gym.html"),
      "Type a name into the 'Full name' field.", "Full name"),
-    ("file:///Volumes/SSD/localdecide/tests/fixtures/flow_shop.html",
+    (_fx("flow_shop.html"),
      "Open the account section.", "Delete my account"),
-    ("file:///Volumes/SSD/localdecide/tests/fixtures/multilingual.html",
+    (_fx("multilingual.html"),
      "Click the control labelled '登录'.", "登录"),
 ]
 

@@ -1,7 +1,7 @@
 
 import sys
-sys.path.insert(0, "/Volumes/SSD/localdecide")
-sys.path.insert(0, "/Volumes/SSD/localdecide/tests")
+sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parents[2]))
+sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parents[2] / "tests"))
 from localdecide import BrowserDecider, Decider, Scope, goal_tokens
 from test_contract import _SequenceBackend, FakeDriver, TestScope
 
