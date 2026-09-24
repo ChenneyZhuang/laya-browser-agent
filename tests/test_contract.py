@@ -259,6 +259,36 @@ class TestElementTable(unittest.TestCase):
         self.assertNotIn("elements", table.state(layout="v3"))
         self.assertIn("elements", table.state(layout="v1"))
 
+    def test_dropdown_options_are_scoped_to_their_fields(self):
+        actions = self.observation["actions"]
+        actions.append({"kind": "select", "node": "n4", "label": "Language",
+                        "options": [{"label": "English", "value": "en"},
+                                    {"label": "Spanish", "value": "es"}]})
+        table = build_element_table(self.observation)
+        questions = table_to_questions(table, "Select Spanish as the language")
+        self.assertEqual(set(questions["select_option_3"]["criteria"]), {"3:1", "3:2"})
+        self.assertEqual(set(questions["select_option_4"]["criteria"]), {"4:1", "4:2"})
+        self.assertEqual(questions["select_option_4"]["instructions"]["field"], "Language")
+        self.assertNotIn("select_option", questions)
+        single = table_to_questions(build_element_table({"actions": [actions[2]]}), "Select Japan")
+        self.assertIn("select_option", single)
+
+    def test_loop_selects_option_from_chosen_dropdown(self):
+        observation = {"url": "https://example.com", "actions": [
+            {"kind": "select", "node": "country", "label": "Country",
+             "options": [{"label": "Japan", "value": "JP"}, {"label": "France", "value": "FR"}]},
+            {"kind": "select", "node": "language", "label": "Language",
+             "options": [{"label": "English", "value": "en"}, {"label": "Japanese", "value": "ja"}]},
+        ]}
+        backend = _SequenceBackend([{"operation": "SELECT", "select_target": "2",
+                                     "select_option_1": "1:1", "select_option_2": "2:2"}])
+        driver = FakeDriver([observation])
+        run = BrowserDecider(decider=Decider(backend=backend), max_steps=1,
+                             scope=Scope(prefer_words=["Country", "Language"])).run(
+            driver, "Set language to Japanese")
+        self.assertEqual(driver.executed, [("SELECT", "2", "ja")])
+        self.assertEqual(run.stopped, "max_steps")
+
 
 class FakeDriver:
     """A driver that replays a scripted sequence of observations."""

@@ -321,14 +321,16 @@ class BrowserDecider:
                 # option matters, so fetch it here rather than letting the driver guess.
                 option: Optional[str] = None
                 if operation == "SELECT":
-                    if "select_option" not in answers.raw:
+                    option_question = (f"select_option_{target}"
+                                       if f"select_option_{target}" in questions else "select_option")
+                    if option_question not in answers.raw:
                         run.steps.append(Step(number, operation, target, element.label if element else "",
                                               confidence, decision.latency_ms, False,
                                               detail="SELECT chosen but the page offered no dropdown options"))
                         self._emit(run.steps[-1])
                         run.stopped, run.error = "error", "SELECT without observable options"
                         return run
-                    option_key = answers.choice("select_option")
+                    option_key = answers.choice(option_question)
                     matched = None
                     for candidate in (element.meta.get("options") if element else None) or []:
                         if str(candidate.get("index")) == str(option_key):
@@ -349,7 +351,7 @@ class BrowserDecider:
                         self._emit(run.steps[-1])
                         run.stopped, run.error = "error", "empty dropdown option"
                         return run
-                    confidence = min(confidence, answers.confidence("select_option"))
+                    confidence = min(confidence, answers.confidence(option_question))
 
                 # Loop guard: same operation on the same target twice with no page change.
                 repeats = sum(1 for item in history[-2:]
