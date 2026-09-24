@@ -280,7 +280,8 @@ def table_to_questions(table: ElementTable, goal: str, *, operations: Optional[M
     * `operation`    - always present; the closed set is whatever the page can actually do
     * `click_target` / `type_text_target` / `select_target` - one per supported operation,
                        each listing only the elements that support it
-    * `select_option` - when a SELECT is in play, the observed option for a dropdown
+    * `select_option` - for one dropdown, its observed options
+    * `select_option_<index>` - for multiple dropdowns, options tied to each field
 
     Speculative target questions are free: all of them are answered in the *same*
     forward pass, and the executor uses only the one matching the chosen operation.
@@ -316,12 +317,13 @@ def table_to_questions(table: ElementTable, goal: str, *, operations: Optional[M
     # A dropdown choice is two steps: pick the field (select_target), then pick the
     # option inside it. Options are only offered when a dropdown actually exists.
     dropdowns = {index: element for index, element in table.targets_for("SELECT").items() if element.options}
-    if dropdowns:
-        questions["select_option"] = {
+    for index, element in dropdowns.items():
+        name = "select_option" if len(dropdowns) == 1 else f"select_option_{index}"
+        questions[name] = {
             "type": "choice",
             "criteria": {option["index"]: f"[{option['index']}] {option['label']}"
-                         for element in dropdowns.values() for option in element.options},
-            "instructions": {"goal": goal,
-                             "rules": [TARGET_RULES, "Choose an observed dropdown option."]},
+                         for option in element.options},
+            "instructions": {"goal": goal, "field": element.label,
+                             "rules": [TARGET_RULES, "Choose an observed option for this dropdown."]},
         }
     return questions

@@ -461,8 +461,9 @@ observe()  ──►  ElementTable  ──►  questions  ──►  local model
    things, `TYPE_TEXT` only editable fields). An option the executor cannot act on is
    never offered.
 3. **Ask.** `table_to_questions` builds one `operation` question plus, speculatively,
-   one target question per operation. They are all answered in a *single forward pass*
-   — two decisions, one round trip.
+   one target question per operation. When a page has several dropdowns, each gets
+   its own option question, so the chosen option belongs to the chosen field. They
+   are answered in a *single forward pass* — one round trip.
 4. **Validate.** Nothing leaves the decision layer until it passes: offered key,
    finite probabilities that sum to one, argmax agreement.
 5. **Act.** The loop resolves the chosen index to your handle and calls your executor.
