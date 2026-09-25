@@ -509,6 +509,29 @@ Every number here was measured on this project's development machine — Apple M
 16 GB, `laya-mlx` 0.1.0, `cklxx/laya-browser` **v10s** checkpoint — against real pages
 in a real Chromium. Nothing is copied from a vendor's marketing.
 
+### Our fine-tuned checkpoint: v32b (beats the official one)
+
+The harness defaults to the official `v10s` checkpoint, but this project also
+trained **[ichenney/laya-browser-v32b](https://huggingface.co/ichenney/laya-browser-v32b)** —
+a frozen-encoder head fine-tune of `cklxx/laya-browser` that adds SCROLL_UP/recovery,
+counterfactual ranking, and a `noul` (statement-holds) corpus the upstream pipeline
+never produced. Same license (Apache-2.0), same architecture, drop-in swap:
+
+| Benchmark (2026-09-25) | **v32b** | official td | hosted Jev |
+|---|---:|---:|---:|
+| recovery2-holdout (240) | **0.7125** | 0.425 | — |
+| MiniWoB-116 | **0.9138** | 0.6638 | — |
+| browser-suite v4 | **0.5143** | 0.500 | — |
+| browser-suite v5 | 0.5636 | **0.5818** | — |
+| JevBench hard | **0.4144** | 0.243 | 0.7207 |
+| decision latency (p50) | **27 ms** (RTX 3080) | — | 854 ms (network) |
+
+Full methodology, per-family breakdowns, the noul root-cause analysis, and every
+eval JSON: [`reports/v20/MULTIDIM_COMPARISON.md`](reports/v20/MULTIDIM_COMPARISON.md)
+and [`reports/v20/JEV_COMPARISON.md`](reports/v20/JEV_COMPARISON.md).
+
+To use it: `LayaTorchBackend(model="ichenney/laya-browser-v32b", subfolder="v32b")`.
+
 ### Latency is dominated by how much you show the model
 
 This is the single most important operational fact in this repo. Same page, same

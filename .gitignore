@@ -33,9 +33,15 @@ models/
 *.log
 /tmp/
 CODEX_3080_FINETUNE_TASK.md
+# HF upload staging (1.3GB checkpoint; lives on the Hub, not in git)
+hf-release/
 # Local secrets (API keys) — never commit
 .env
 *.env.local
 
 # Local training/eval reports (belong to the finetune branch, not this repo)
-reports/
+reports/*
+!reports/v20/
+reports/v20/*
+!reports/v20/MULTIDIM_COMPARISON.md
+!reports/v20/JEV_COMPARISON.md
