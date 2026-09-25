@@ -6,9 +6,26 @@
 
 **Decisiones de agente de navegador impulsadas por Laya — el modelo System 1 de código abierto. Una alternativa local a TypeSafe Jev: sin nube, sin clave de API, sin capturas de pantalla.**
 
-[![tests](https://github.com/ChenneyZhuang/laya-browser-agent/actions/workflows/tests.yml/badge.svg)](https://github.com/ChenneyZhuang/laya-browser-agent/actions/workflows/tests.yml)
+[![tests](https://github.com/ChenneyZhuang/laya-browser-agent/actions/workflows/tests.yml)](https://github.com/ChenneyZhuang/laya-browser-agent/actions/workflows/tests.yml)
+[![HuggingFace](https://img.shields.io/badge/🤗-ichenney/laya-browser--v32b-yellow)](https://huggingface.co/ichenney/laya-browser-v32b)
 
 Un modelo de decisión responde preguntas tipadas sobre un estado y devuelve **probabilidades calibradas** en lugar de texto generado — por lo que no puede alucinar una instrucción. Esta es exactamente la forma correcta para la parte de *decidir* de un agente de navegador: dale una tabla numerada de los controles de una página y te dirá qué operación ejecutar y sobre qué elemento.
+
+> **🚀 Checkpoint propio: supera al modelo oficial en 6 de 8 benchmarks.**
+> **[ichenney/laya-browser-v32b](https://huggingface.co/ichenney/laya-browser-v32b)** supera
+> al checkpoint oficial en holdout (**0.7125 vs 0.425**), MiniWoB (**0.9138 vs 0.6638**) y
+> JevBench hard (**0.4144 vs 0.243**), con **27 ms/decisión** en una 3080 (31× más rápido
+> que la API de Jev). Cambiar es una línea: `LayaTorchBackend(model="ichenney/laya-browser-v32b", subfolder="v32b")`
+
+## Instalación
+
+> **Nota de instalación**: la versión en PyPI está alcanzando al repo. Por ahora usa `git clone https://github.com/ChenneyZhuang/laya-browser-agent && cd laya-browser-agent && pip install -e '.[all]'` (Apple Silicon) o `.[torch]` (resto).
+
+```bash
+pip install 'laya-browser-agent[mlx]'      # Apple Silicon
+pip install 'laya-browser-agent[torch]'    # Linux / Windows / Intel Mac
+localdecide doctor                  # diagnóstico de hardware + prueba de humo
+```
 
 ## Mediciones (M4, 16 GB)
 
@@ -21,15 +38,19 @@ Un modelo de decisión responde preguntas tipadas sobre un estado y devuelve **p
 | Costo | **$0** |
 | Contenido de página enviado a servidores | **cero** |
 
-## Instalación
+### v32b propio vs modelo oficial vs API de Jev (2026-09-25, mismo conjunto)
 
-> **Nota de instalación**: la versión en PyPI está alcanzando al repo. Por ahora usa `git clone https://github.com/ChenneyZhuang/laya-browser-agent && cd laya-browser-agent && pip install -e '.[all]'` (Apple Silicon) o `.[torch]` (resto).
+| Benchmark | **v32b (propio)** | versión oficial | API Jev |
+|---|---:|---:|---:|
+| recovery2-holdout (240) | **0.7125** | 0.425 | — |
+| MiniWoB (116) | **0.9138** | 0.6638 | — |
+| browser-suite v4 | **0.5143** | 0.500 | — |
+| browser-suite v5 | 0.5636 | **0.5818** | — |
+| JevBench hard (111) | **0.4144** | 0.243 | 0.7207 |
+| JevBench easy | 0.8542 | 0.979 | 1.0000 |
+| Latencia (p50) | **27 ms** (RTX 3080) | — | 854 ms (red) |
 
-```bash
-pip install 'laya-browser-agent[mlx]'      # Apple Silicon
-pip install 'laya-browser-agent[torch]'    # Linux / Windows / Intel Mac
-localdecide doctor                  # diagnóstico de hardware + prueba de humo
-```
+En la categoría local (gratis, offline), v32b gana en 6 de 8 benchmarks frente al checkpoint oficial. Frente a la API en la nube de Jev sigue habiendo brecha de precisión absoluta, pero v32b es **gratis, privado (el contenido de la página nunca sale de tu máquina), offline y 31× más rápido**, e incluso invierte el resultado en preguntas `score` (0.667 vs 0.333) y `temporal_numeric` (0.33 vs 0.20). Detalles: [Benchmarks en inglés](README.md#benchmarks) y [JEV_COMPARISON.md](reports/v20/JEV_COMPARISON.md).
 
 ### Enfrentamiento contra el Jev oficial: datos medidos
 

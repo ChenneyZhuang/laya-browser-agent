@@ -6,9 +6,26 @@
 
 **Laya 駆動のブラウザエージェント決定エンジン — オープンソースの System 1 モデル。TypeSafe Jev のローカル代替：クラウド不要、API キー不要、スクリーンショット不要。**
 
-[![tests](https://github.com/ChenneyZhuang/laya-browser-agent/actions/workflows/tests.yml/badge.svg)](https://github.com/ChenneyZhuang/laya-browser-agent/actions/workflows/tests.yml)
+[![tests](https://github.com/ChenneyZhuang/laya-browser-agent/actions/workflows/tests.yml)](https://github.com/ChenneyZhuang/laya-browser-agent/actions/workflows/tests.yml)
+[![HuggingFace](https://img.shields.io/badge/🤗-ichenney/laya-browser--v32b-yellow)](https://huggingface.co/ichenney/laya-browser-v32b)
 
 決定モデルは状態について型付きの質問に答え、生成テキストではなく**較正された確率**を返します。テキストを生成しないため、指示を幻覚することはありません。ページ上の操作可能な要素の番号付きリストを渡すと、次に実行すべき操作と対象要素を教えてくれます。これがブラウザエージェントの「決定」部分に最適な形です。
+
+> **🚀 独自ファインチューン済みチェックポイント：8ベンチマーク中6つで公式モデルを上回る。**
+> **[ichenney/laya-browser-v32b](https://huggingface.co/ichenney/laya-browser-v32b)** は
+> holdout（**0.7125 vs 公式 0.425**）、MiniWoB（**0.9138 vs 0.6638**）、JevBench hard
+> （**0.4144 vs 0.243**）などで公式を凌駕し、3080 GPU で **27 ms/決定**（Jev API の 31 倍速）。
+> 切り替えは一行：`LayaTorchBackend(model="ichenney/laya-browser-v32b", subfolder="v32b")`
+
+## インストール
+
+> **インストール注記**：PyPI 版はリポジトリに追いつきつつあります。今は `git clone https://github.com/ChenneyZhuang/laya-browser-agent && cd laya-browser-agent && pip install -e '.[all]'`（Apple Silicon）または `.[torch]`（その他）を推奨。
+
+```bash
+pip install 'laya-browser-agent[mlx]'      # Apple Silicon
+pip install 'laya-browser-agent[torch]'    # Linux / Windows / Intel Mac
+localdecide doctor                  # ハードウェア診断 + スモークテスト
+```
 
 ## 測定値（M4, 16 GB）
 
@@ -21,15 +38,19 @@
 | コスト | **$0** |
 | ページ内容の外部送信 | **なし** |
 
-## インストール
+### 独自 v32b vs 公式モデル vs Jev API（2026-09-25 実測、同一セット）
 
-> **インストール注記**：PyPI 版はリポジトリに追いつきつつあります。今は `git clone https://github.com/ChenneyZhuang/laya-browser-agent && cd laya-browser-agent && pip install -e '.[all]'`（Apple Silicon）または `.[torch]`（その他）を推奨。
+| ベンチマーク | **v32b（独自）** | 公式ブラウザ版 | Jev API |
+|---|---:|---:|---:|
+| recovery2-holdout（240問） | **0.7125** | 0.425 | — |
+| MiniWoB（116問） | **0.9138** | 0.6638 | — |
+| browser-suite v4 | **0.5143** | 0.500 | — |
+| browser-suite v5 | 0.5636 | **0.5818** | — |
+| JevBench hard（111問） | **0.4144** | 0.243 | 0.7207 |
+| JevBench easy | 0.8542 | 0.979 | 1.0000 |
+| レイテンシ（p50） | **27 ms**（RTX 3080） | — | 854 ms（ネットワーク） |
 
-```bash
-pip install 'laya-browser-agent[mlx]'      # Apple Silicon
-pip install 'laya-browser-agent[torch]'    # Linux / Windows / Intel Mac
-localdecide doctor                  # ハードウェア診断 + スモークテスト
-```
+ローカル（無料・オフライン）枠では 8 項目中 6 項目で公式を上回る。Jev クラウド API には絶対精度で及ばないが、**無料・プライバシー（ページ内容は端末外に出ない）・オフライン・31 倍速**で、`score` 問題（0.667 vs 0.333）と `temporal_numeric`（0.33 vs 0.20）では Jev を逆転。詳細は [英語版 Benchmarks](README.md#benchmarks) と [JEV_COMPARISON.md](reports/v20/JEV_COMPARISON.md)。
 
 ### 公式 Jev との対決：実測データ
 

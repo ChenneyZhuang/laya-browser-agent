@@ -6,6 +6,7 @@
 
 [![tests](https://github.com/ChenneyZhuang/laya-browser-agent/actions/workflows/tests.yml/badge.svg)](https://github.com/ChenneyZhuang/laya-browser-agent/actions/workflows/tests.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![HuggingFace](https://img.shields.io/badge/🤗-ichenney/laya-browser--v32b-yellow)](https://huggingface.co/ichenney/laya-browser-v32b)
 ![GitHub release](https://img.shields.io/github/v/tag/ChenneyZhuang/laya-browser-agent)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![Runs on](https://img.shields.io/badge/runs%20on-Apple%20Silicon%20%7C%20CUDA%20%7C%20CPU-black)
@@ -25,6 +26,15 @@ and which element to act on.
 
 This project wires those models into that role, locally, for whatever agent you
 already use.
+
+> **🚀 Fine-tuned checkpoint included:** this project also trains
+> **[ichenney/laya-browser-v32b](https://huggingface.co/ichenney/laya-browser-v32b)**,
+> which **beats the official browser-tuned Laya checkpoint on 6 of 8 benchmarks** —
+> holdout **0.7125 vs 0.425**, MiniWoB **0.9138 vs 0.6638**, JevBench hard
+> **0.4144 vs 0.243** — and runs at **27 ms/decision on a 3080** (31× faster than
+> the hosted Jev API). One line to use:
+> `LayaTorchBackend(model="ichenney/laya-browser-v32b", subfolder="v32b")`.
+> [Full comparison →](#benchmarks)
 
 ```python
 from localdecide import BrowserDecider

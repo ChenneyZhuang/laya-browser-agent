@@ -6,23 +6,21 @@
 
 **浏览器 agent 决策，由 Laya 驱动 —— 开源的 System 1 模型。TypeSafe Jev 的本地开源替代：无云端、无 API key、无截图。**
 
-[![tests](https://github.com/ChenneyZhuang/laya-browser-agent/actions/workflows/tests.yml/badge.svg)](https://github.com/ChenneyZhuang/laya-browser-agent/actions/workflows/tests.yml)
+[![tests](https://github.com/ChenneyZhuang/laya-browser-agent/actions/workflows/tests.yml)](https://github.com/ChenneyZhuang/laya-browser-agent/actions/workflows/tests.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![HuggingFace](https://img.shields.io/badge/🤗-ichenney/laya-browser--v32b-yellow)](https://huggingface.co/ichenney/laya-browser-v32b)
 
 决策模型对状态回答结构化问题，返回**校准过的概率**而非生成的文字——因此它不可能幻觉出一条指令。这正是浏览器 agent "决定"那一半的理想形态：给它一张页面上可交互元素的编号表，它告诉你下一步该执行什么操作、作用于哪个元素。
 
 本项目把这类模型接进这个角色——**完全在本地运行**，适配你已有的任何 agent。
 
-## 实测数据（M4, 16 GB）
-
-| 指标 | 数值 |
-|---|---|
-| 短文本决策 | 10–30 ms |
-| 浏览器单步（限定 20 个元素） | ~333 ms |
-| 吞吐量 | 最高 ~100 决策/秒 |
-| 多语言目标（grounding 开启） | 9 个命中 8 个 |
-| 费用 | **$0**（无 API，无计量）|
-| 页面内容发送到服务器 | **零** |
+> **🚀 自训 checkpoint：8 项基准 6 项超越官方模型。** 本项目训练的
+> **[ichenney/laya-browser-v32b](https://huggingface.co/ichenney/laya-browser-v32b)**
+> 在 holdout（**0.7125 vs 官方 0.425**）、MiniWoB（**0.9138 vs 0.6638**）、JevBench hard
+> （**0.4144 vs 0.243**）等 6/8 项基准上超越官方浏览器微调版，3080 上单步决策仅 **27 ms**
+> （比 Jev 云端 API 快 31 倍）。一行切换：
+> `LayaTorchBackend(model="ichenney/laya-browser-v32b", subfolder="v32b")`。
+> [完整对比数据 →](#实测数据)
 
 ## 安装
 
@@ -46,6 +44,40 @@ localdecide doctor
 ```
 
 模型首次使用时下载一次（约 650 MB），之后全部离线。
+
+## 实测数据（M4, 16 GB）
+
+| 指标 | 数值 |
+|---|---|
+| 短文本决策 | 10–30 ms |
+| 浏览器单步（限定 20 个元素） | ~333 ms |
+| 吞吐量 | 最高 ~100 决策/秒 |
+| 多语言目标（grounding 开启） | 9 个命中 8 个 |
+| 费用 | **$0**（无 API，无计量） |
+| 页面内容发送到服务器 | **零** |
+
+### 自训 v32b vs 官方模型 vs Jev 云端 API（2026-09-25 实测，同套题）
+
+| 基准 | **v32b（自训）** | 官方浏览器微调版 | Jev 云端 API |
+|---|---:|---:|---:|
+| recovery2-holdout（240 题） | **0.7125** | 0.425 | — |
+| MiniWoB（116 题） | **0.9138** | 0.6638 | — |
+| browser-suite v4 | **0.5143** | 0.500 | — |
+| browser-suite v5 | 0.5636 | **0.5818** | — |
+| JevBench hard（111 题） | **0.4144** | 0.243 | 0.7207 |
+| JevBench easy | 0.8542 | 0.979 | 1.0000 |
+| 决策延迟（p50） | **27 ms**（RTX 3080） | — | 854 ms（网络往返） |
+
+**怎么读这张表**：本地赛道（不花钱、不上云）里，v32b 在 8 项基准中 6 项领先官方浏览器
+微调 checkpoint——holdout 大幅领先 28.8 个百分点，MiniWoB 领先 25 个百分点。与 Jev 云端
+API 相比，绝对精度仍有差距（Jev 是云端大模型），但 v32b **免费、隐私（页面内容不出本机）、
+可离线、快 31 倍**，且在 `score` 评分题（0.667 vs 0.333）和 `temporal_numeric`（0.33 vs
+0.20）两类题上反超 Jev。
+
+v32b 的关键改进：上游训练管线从不生成 `noul`（命题判断）训练项——探针实测否定类判断
+准确率仅 37%。自建 8k 条 noul 语料后提升到 100%，done_judgment 家族从 0.615 提到 0.769。
+完整配方与逐项数据见 [MULTIDIM_COMPARISON.md](reports/v20/MULTIDIM_COMPARISON.md)
+与 [JEV_COMPARISON.md](reports/v20/JEV_COMPARISON.md)。
 
 ## 快速上手
 
