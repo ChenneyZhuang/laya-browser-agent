@@ -82,7 +82,8 @@ API 相比，绝对精度仍有差距（Jev 是云端大模型），但 v32b **�
 v32b 的关键改进：上游训练管线从不生成 `noul`（命题判断）训练项——探针实测否定类判断
 准确率仅 37%。自建 8k 条 noul 语料后提升到 100%，done_judgment 家族从 0.615 提到 0.769。
 完整配方与逐项数据见 [MULTIDIM_COMPARISON.md](reports/v20/MULTIDIM_COMPARISON.md)
-与 [JEV_COMPARISON.md](reports/v20/JEV_COMPARISON.md)。
+与 [JEV_COMPARISON.md](reports/v20/JEV_COMPARISON.md)；全部 15 个版本、所有失败路径与
+训练脚本存档在配套仓库 [laya-training-log](https://github.com/ChenneyZhuang/laya-training-log)。
 
 ## 快速上手
 

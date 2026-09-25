@@ -75,6 +75,8 @@ Flujos multi-paso: **ningún motor completa hoy el flujo de compra scripted sin 
 
 **Conclusión**: precisión inmediata (especialmente multilingüe) → Jev oficial (~$0.000017 por decisión); privacidad / offline / volumen gratis → versión local, con latencia comparable y multilingüe como su eje más débil.
 
+Las 15 versiones, todas las rutas fallidas y los scripts de entrenamiento están publicados en el repositorio hermano [laya-training-log](https://github.com/ChenneyZhuang/laya-training-log).
+
 ### Verificado contra la API real de Jev
 
 El dialecto `systemone` de este repositorio fue validado de extremo a extremo contra el endpoint de producción de TypeSafe (`api.typesafe.ai/v1/systemone`, modelo `jev-1.13.0`) el 2026-09-22. **Cada tipo de pregunta exige el campo `criteria`** — en `choice` es un mapa de opción → descripción (no un string), en `score` es un array. El mismo payload apuntado al `localdecide serve` local produce la misma forma de respuesta con el modelo Laya local; cambiar de uno a otro es cambiar una sola URL base.

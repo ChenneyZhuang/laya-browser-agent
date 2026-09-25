@@ -60,6 +60,8 @@ localdecide doctor                  # ハードウェア診断 + スモークテ
 
 ローカル（無料・オフライン）枠では 8 項目中 6 項目で公式を上回る。Jev クラウド API には絶対精度で及ばないが、**無料・プライバシー（ページ内容は端末外に出ない）・オフライン・31 倍速**で、`score` 問題（0.667 vs 0.333）と `temporal_numeric`（0.33 vs 0.20）では Jev を逆転。詳細は [英語版 Benchmarks](README.md#benchmarks) と [JEV_COMPARISON.md](reports/v20/JEV_COMPARISON.md)。
 
+全 15 バージョン・すべての失敗パス・トレーニングスクリプトは姉妹リポジトリ [laya-training-log](https://github.com/ChenneyZhuang/laya-training-log) に公開。
+
 ### 公式 Jev との対決：実測データ
 
 以下の対戦は v32b 登場前の実施で、ローカル側は当時の公式 v10s チェックポイント（歴史的記録として保持。v32b は 8 ベンチマーク中 6 つで v10s を上回る、上表参照）。`examples/diagnostics/jev_head_to_head.py`（単発）と `jev_flow_h2h.py`（マルチステップ）で、同じタスクをローカル Laya v10s と公式 jev-1.13.0 に実行して比較：

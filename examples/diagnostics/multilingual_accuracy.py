@@ -1,5 +1,8 @@
 """Why does the Chinese goal fail, and does a different checkpoint fix it?
 
+(NB: this probe was run against the then-default cklxx v10s checkpoint; the
+current default is the fine-tuned v32b, which shares the same mmBERT encoder.)
+
 The browser checkpoint (cklxx/laya-browser v10s) is built on mmBERT-base, which claims
 100+ language coverage. The position-bias sweep showed it failing on a Chinese goal while
 nailing every English one. Before tuning anything, find out whether this is:
