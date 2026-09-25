@@ -14,12 +14,13 @@
 
 本项目把这类模型接进这个角色——**完全在本地运行**，适配你已有的任何 agent。
 
-> **🚀 自训 checkpoint：8 项基准 6 项超越官方模型。** 本项目训练的
-> **[ichenney/laya-browser-v32b](https://huggingface.co/ichenney/laya-browser-v32b)**
-> 在 holdout（**0.7125 vs 官方 0.425**）、MiniWoB（**0.9138 vs 0.6638**）、JevBench hard
-> （**0.4144 vs 0.243**）等 6/8 项基准上超越官方浏览器微调版，3080 上单步决策仅 **27 ms**
-> （比 Jev 云端 API 快 31 倍）。一行切换：
-> `LayaTorchBackend(model="ichenney/laya-browser-v32b", subfolder="v32b")`。
+> **🚀 自训 checkpoint 已设为默认模型：8 项基准 6 项超越官方。** `model="browser"`
+> 现在直接加载本项目训练的
+> **[ichenney/laya-browser-v32b](https://huggingface.co/ichenney/laya-browser-v32b)**——
+> holdout **0.7125 vs 官方 0.425**、MiniWoB **0.9138 vs 0.6638**、JevBench hard
+> **0.4144 vs 0.243**，6/8 项基准领先官方浏览器微调版；3080 上单步决策 **27 ms**，
+> 比 Jev 云端 API 快 31 倍。零代码改动，HF Hub 自动下载，之后完全离线。
+> 想继续用官方 checkpoint：`model="browser-legacy"`。
 > [完整对比数据 →](#实测数据)
 
 ## 安装
@@ -43,9 +44,13 @@ pip install 'laya-browser-agent[playwright]' && playwright install chromium
 localdecide doctor
 ```
 
-模型首次使用时下载一次（约 650 MB），之后全部离线。
+默认 v32b 模型首次使用时下载一次（约 1.3 GB；`browser-legacy` 官方 v10s 版约 650 MB），之后全部离线。
 
 ## 实测数据（M4, 16 GB）
+
+> 所有数字都在本项目的开发机上实测：Apple M4（16 GB, `laya-mlx`）做推理延迟，
+> RTX 3080 做微调与批量评测，页面均为真实 Chromium。没有抄任何厂商营销数字。
+> 早于 v32b 的与 Jev 对比数据用的是官方 v10s checkpoint，已标注保留作历史记录。
 
 | 指标 | 数值 |
 |---|---|
@@ -56,9 +61,9 @@ localdecide doctor
 | 费用 | **$0**（无 API，无计量） |
 | 页面内容发送到服务器 | **零** |
 
-### 自训 v32b vs 官方模型 vs Jev 云端 API（2026-09-25 实测，同套题）
+### 自训 v32b（现默认模型）vs 官方模型 vs Jev 云端 API（2026-09-25 实测，同套题）
 
-| 基准 | **v32b（自训）** | 官方浏览器微调版 | Jev 云端 API |
+| 基准 | **v32b（自训，默认）** | 官方浏览器微调版 (v10s/td) | Jev 云端 API |
 |---|---:|---:|---:|
 | recovery2-holdout（240 题） | **0.7125** | 0.425 | — |
 | MiniWoB（116 题） | **0.9138** | 0.6638 | — |
@@ -92,7 +97,7 @@ with PlaywrightDriver(start_url="https://en.wikipedia.org/wiki/Main_Page") as dr
 
 ### 与官方 Jev 的正面对决：实测数据
 
-`examples/diagnostics/jev_head_to_head.py`（单步）与 `jev_flow_h2h.py`（多步完整流程）把同样的任务分别喂给本地 Laya v10s 与官方 jev-1.13.0：
+以下对战在 v32b 诞生前完成，本地侧用的是当时的官方 v10s checkpoint（历史记录保留；v32b 在 6/8 项基准上已超越 v10s，见上表）。`examples/diagnostics/jev_head_to_head.py`（单步）与 `jev_flow_h2h.py`（多步完整流程）把同样的任务分别喂给本地 Laya v10s 与官方 jev-1.13.0：
 
 | 单步零上下文（12 题 / 6 语言） | 本地 v10s | 官方 Jev |
 |---|---|---|

@@ -112,7 +112,7 @@ The same payload, with `url` pointed at the bundled `localdecide serve`
 checkpoint — so code written against one works against the other by changing
 one base URL. `score` questions take `criteria` as an **array** of level names.
 
-### Head-to-head vs hosted Jev: measured, not claimed
+### Head-to-head vs hosted Jev: measured, not claimed (v10s era, kept for provenance)
 
 `examples/diagnostics/jev_head_to_head.py` runs the same 12 single-step
 element-table decisions through both engines — the local Laya v10s checkpoint
@@ -305,12 +305,12 @@ changes by device is which runtime you install and how big a decision you can af
 | Device | Runtime | Expected experience |
 |---|---|---|
 | **Apple Silicon M-series, 16 GB+** (M1–M4) | `laya-mlx` | The reference experience: 10–30 ms short decisions, ~330 ms scoped browser steps, everything local. This is what the benchmarks above measure. |
-| **Apple Silicon, 8 GB** (M1/M2 base) | `laya-mlx` | Works, but 650 MB checkpoint + Chromium is tight. The subprocess design keeps one model OR one browser resident; close heavy apps. Expect swap pressure on big pages. |
+| **Apple Silicon, 8 GB** (M1/M2 base) | `laya-mlx` | Works, but the 1.3 GB v32b checkpoint (or 650 MB `browser-legacy`) + Chromium is tight. The subprocess design keeps one model OR one browser resident; close heavy apps. Expect swap pressure on big pages. |
 | **Intel Mac** | `laya` (PyTorch) | `laya-mlx` does not run here. Model works; expect ~2–4× the Apple Silicon latency on CPU. Browser loop fine. (Note: GitHub retired the macos-13 runner image in Dec 2025; Intel macOS CI now runs on macos-15-intel, which GitHub itself plans to retire in 2027 — Intel macOS support has a countdown.) |
 | **Linux server, CPU only** | `laya` (PyTorch) | Good for batch deciding (no browser needed for classification). Browser loops work headless. Latency similar to Intel Mac CPU. |
 | **Linux + NVIDIA GPU** | `laya` (PyTorch, CUDA) | Best PyTorch path — GPU inference cuts latency well below CPU. Also the only place you can *fine-tune* (the laya-browser recipe needs CUDA). |
 | **Windows** | `laya` (PyTorch) | Works; same expectations as Linux CPU. Playwright supports it natively. |
-| **Below 8 GB total / Raspberry Pi class** | — | Not supported. The checkpoint alone is 650 MB and the decision heads want ~1 GB resident. Use the HTTP backend to reach another machine instead. |
+| **Below 8 GB total / Raspberry Pi class** | — | Not supported. The v32b checkpoint alone is 1.3 GB (v10s legacy: 650 MB) and the decision heads want ~1 GB resident. Use the HTTP backend to reach another machine instead. |
 | **Any device, model elsewhere** | `HTTPBackend` | Point `Decider("http://host:8791/v1/...")` at a machine that has the model. Your page content goes to *your* other machine, not to a cloud. |
 
 Two things that do **not** change by device:
@@ -515,34 +515,27 @@ the loop — and skipping them is a large part of why this is fast and cheap.
 
 ## Benchmarks
 
-Every number here was measured on this project's development machine — Apple M4,
-16 GB, `laya-mlx` 0.1.0, `cklxx/laya-browser` **v10s** checkpoint — against real pages
-in a real Chromium. Nothing is copied from a vendor's marketing.
+Every number here was measured on this project's development machines — an Apple M4
+(16 GB, `laya-mlx`) and an RTX 3080 (fine-tuning + eval) — against real pages in a
+real Chromium. Nothing is copied from a vendor's marketing. Head-to-head batteries
+that predate the v32b checkpoint used the official `v10s` checkpoint as the local
+side; they are labeled as such and kept for provenance.
 
-### Our fine-tuned checkpoint: v32b (beats the official one)
+### Our fine-tuned checkpoint: v32b — now the default
 
-The harness defaults to the official `v10s` checkpoint, but this project also
-trained **[ichenney/laya-browser-v32b](https://huggingface.co/ichenney/laya-browser-v32b)** —
-a frozen-encoder head fine-tune of `cklxx/laya-browser` that adds SCROLL_UP/recovery,
-counterfactual ranking, and a `noul` (statement-holds) corpus the upstream pipeline
-never produced. Same license (Apache-2.0), same architecture, drop-in swap:
-
-| Benchmark (2026-09-25) | **v32b** | official td | hosted Jev |
-|---|---:|---:|---:|
-| recovery2-holdout (240) | **0.7125** | 0.425 | — |
-| MiniWoB-116 | **0.9138** | 0.6638 | — |
-| browser-suite v4 | **0.5143** | 0.500 | — |
-| browser-suite v5 | 0.5636 | **0.5818** | — |
-| JevBench hard | **0.4144** | 0.243 | 0.7207 |
-| decision latency (p50) | **27 ms** (RTX 3080) | — | 854 ms (network) |
+**`model="browser"` now loads
+[ichenney/laya-browser-v32b](https://huggingface.co/ichenney/laya-browser-v32b)** —
+this project's own frozen-encoder head fine-tune that **beats the official
+`v10s` checkpoint on 6 of 8 benchmarks** (holdout **0.7125 vs 0.425**, MiniWoB
+**0.9138 vs 0.6638**, JevBench hard **0.4144 vs 0.243**). Zero code changes
+needed; it downloads once via HF Hub and runs offline after that. To stay on the
+upstream checkpoint, pass `model="browser-legacy"`.
 
 Full methodology, per-family breakdowns, the noul root-cause analysis, and every
 eval JSON: [`reports/v20/MULTIDIM_COMPARISON.md`](reports/v20/MULTIDIM_COMPARISON.md)
 and [`reports/v20/JEV_COMPARISON.md`](reports/v20/JEV_COMPARISON.md).
 The complete training story — every version, every failed path, all scripts —
 lives in the companion repo **[laya-training-log](https://github.com/ChenneyZhuang/laya-training-log)**.
-
-To use it: `LayaTorchBackend(model="ichenney/laya-browser-v32b", subfolder="v32b")`.
 
 ### Latency is dominated by how much you show the model
 
@@ -717,8 +710,8 @@ The key differences from running against hosted Jev:
 | Latency per decision | 150–400 ms network round trip | 10–30 ms local (scoped page: ~333 ms) |
 | Cost | $0.042/M input tokens | $0 |
 | Page content | sent to TypeSafe | never leaves the machine |
-| Checkpoint | TypeSafe's, updated server-side | Laya browser-tuned v10s, you pin the version |
-| Fine-tuning | not possible | the laya-browser recipe (needs CUDA) |
+| Checkpoint | TypeSafe's, updated server-side | our fine-tuned v32b by default (or upstream v10s via `browser-legacy`) — you pin the version |
+| Fine-tuning | not possible | done, in-house: [v32b](https://huggingface.co/ichenney/laya-browser-v32b) + [full training log](https://github.com/ChenneyZhuang/laya-training-log) |
 
 ## Reference implementations & sources
 
@@ -731,7 +724,7 @@ stated explicitly, because attribution matters more than a link dump.
 |---|---|---|---|
 | [**Convai Innovations — Laya**](https://github.com/NandhaKishorM/laya) ([weights](https://huggingface.co/convaiinnovations/laya)) | Apache-2.0 | The open-weight System 1 decision model family this project runs. `choice`/`score`/`noul` primitives, the `systemone` request contract. | Loaded as the decision model. The question/answer contract in `decider.py` follows it. No code copied. |
 | [**TypeSafe — Jev**](https://docs.typesafe.ai) | proprietary | The model that defined the "System One model" category and the `/v1/systemone` wire format that agents already speak. | The compatibility dialect in `serve.py` mirrors its public HTTP contract so existing clients work. No code used. |
-| [**cklxx/laya-browser**](https://huggingface.co/cklxx/laya-browser) | Apache-2.0 | **The decisive piece.** Laya fine-tuned into a browser-agent decision head: the training recipe, the v3 input format, and the published v10/v10s/v11s checkpoints that actually work for picking page elements. | Used as the **default checkpoint** (`v10s`). The format insight (elements in the option list, not the state; page text capped ~1.2k) is implemented in `page.state(layout="v3")`. The coarse-to-fine chunking follows its `systemone_server.py` approach. No code copied. |
+| [**cklxx/laya-browser**](https://huggingface.co/cklxx/laya-browser) | Apache-2.0 | **The decisive piece.** Laya fine-tuned into a browser-agent decision head: the training recipe, the v3 input format, and the published v10/v10s/v11s checkpoints that actually work for picking page elements. | The fine-tuning base of our [v32b checkpoint](https://huggingface.co/ichenney/laya-browser-v32b) (now the default, `model="browser"`); the v10s checkpoint remains available as `model="browser-legacy"`. The format insight (elements in the option list, not the state; page text capped ~1.2k) is implemented in `page.state(layout="v3")`. The coarse-to-fine chunking follows its `systemone_server.py` approach. No code copied. |
 | [**mizorewww/laya-mlx**](https://github.com/mizorewww/laya-mlx) | Apache-2.0 | Independent MLX (Apple Silicon) runtime for Laya, with port-fidelity validation. | Used as the Apple Silicon backend (`LayaMLXBackend`). Dependency, not vendored code. |
 
 ### The browser-agent pattern
@@ -881,7 +874,7 @@ Install the extras for your platform: `pip install 'laya-browser-agent[mlx]'` on
 one-decision smoke test, so "OK" means the checkpoint loaded and answered.
 
 **First decision is slow (~10 s)**
-The checkpoint downloads on first use (~650 MB) and loads once per process. Later
+The default v32b checkpoint downloads on first use (~1.3 GB; `browser-legacy` v10s: ~650 MB) and loads once per process. Later
 decisions are milliseconds. Pre-warm by running `localdecide doctor` after install.
 
 **The model picks the wrong element**

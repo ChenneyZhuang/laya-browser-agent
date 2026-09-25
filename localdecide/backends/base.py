@@ -46,11 +46,16 @@ class LayaMLXBackend:
     """
 
     name = "laya-mlx"
-    # The hosted checkpoint that is actually fine-tuned for browser decisions. The base
-    # `convaiinnovations/laya` checkpoints are near-chance at picking a control
-    # (documented top-1 ~0.10 among ~45 candidates), so browser work needs this one.
-    BROWSER_MODEL = "cklxx/laya-browser"
-    BROWSER_SUBFOLDER = "v10s"
+    # Default: our fine-tuned v32b checkpoint (beats the official v10s on 6/8
+    # benchmarks; see README "Benchmarks"). Falls back cleanly: pass
+    # model="browser-legacy" for the upstream cklxx v10s checkpoint.
+    # The base `convaiinnovations/laya` checkpoints are near-chance at picking a
+    # control (documented top-1 ~0.10 among ~45 candidates), so browser work needs
+    # a browser-tuned checkpoint.
+    BROWSER_MODEL = "ichenney/laya-browser-v32b"
+    BROWSER_SUBFOLDER = "v32b"
+    LEGACY_BROWSER_MODEL = "cklxx/laya-browser"
+    LEGACY_BROWSER_SUBFOLDER = "v10s"
 
     def __init__(self, model: str = "browser", subfolder: str | None = None, **kwargs: Any) -> None:
         try:
@@ -64,6 +69,8 @@ class LayaMLXBackend:
         self._kwargs = kwargs
         if model == "browser":
             model, subfolder = self.BROWSER_MODEL, subfolder or self.BROWSER_SUBFOLDER
+        elif model == "browser-legacy":
+            model, subfolder = self.LEGACY_BROWSER_MODEL, subfolder or self.LEGACY_BROWSER_SUBFOLDER
         self._model_arg: Any = model
         self._subfolder: Optional[str] = subfolder
         self._agent = None
@@ -109,6 +116,8 @@ class LayaTorchBackend:
         self._kwargs = kwargs
         if model == "browser":
             model, subfolder = LayaMLXBackend.BROWSER_MODEL, subfolder or LayaMLXBackend.BROWSER_SUBFOLDER
+        elif model == "browser-legacy":
+            model, subfolder = LayaMLXBackend.LEGACY_BROWSER_MODEL, subfolder or LayaMLXBackend.LEGACY_BROWSER_SUBFOLDER
         self._model_arg: Any = model
         self._subfolder: Optional[str] = subfolder
         self._agent = None

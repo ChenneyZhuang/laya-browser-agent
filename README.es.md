@@ -11,11 +11,12 @@
 
 Un modelo de decisión responde preguntas tipadas sobre un estado y devuelve **probabilidades calibradas** en lugar de texto generado — por lo que no puede alucinar una instrucción. Esta es exactamente la forma correcta para la parte de *decidir* de un agente de navegador: dale una tabla numerada de los controles de una página y te dirá qué operación ejecutar y sobre qué elemento.
 
-> **🚀 Checkpoint propio: supera al modelo oficial en 6 de 8 benchmarks.**
-> **[ichenney/laya-browser-v32b](https://huggingface.co/ichenney/laya-browser-v32b)** supera
-> al checkpoint oficial en holdout (**0.7125 vs 0.425**), MiniWoB (**0.9138 vs 0.6638**) y
-> JevBench hard (**0.4144 vs 0.243**), con **27 ms/decisión** en una 3080 (31× más rápido
-> que la API de Jev). Cambiar es una línea: `LayaTorchBackend(model="ichenney/laya-browser-v32b", subfolder="v32b")`
+> **🚀 Checkpoint propio ahora por defecto: supera al oficial en 6 de 8 benchmarks.**
+> `model="browser"` carga ahora **[ichenney/laya-browser-v32b](https://huggingface.co/ichenney/laya-browser-v32b)** —
+> holdout **0.7125 vs 0.425**, MiniWoB **0.9138 vs 0.6638**, JevBench hard **0.4144 vs 0.243**,
+> con **27 ms/decisión** en una 3080 (31× más rápido que la API de Jev). Sin cambios de código;
+> se descarga una vez desde HF Hub y luego funciona offline. Para el checkpoint oficial:
+> `model="browser-legacy"`
 
 ## Instalación
 
@@ -27,7 +28,14 @@ pip install 'laya-browser-agent[torch]'    # Linux / Windows / Intel Mac
 localdecide doctor                  # diagnóstico de hardware + prueba de humo
 ```
 
+El checkpoint v32b por defecto se descarga una sola vez (~1,3 GB; el `browser-legacy`
+v10s oficial: ~650 MB). Después funciona totalmente offline.
+
 ## Mediciones (M4, 16 GB)
+
+> Todos los números están medidos en las máquinas de desarrollo: Apple M4 (16 GB, `laya-mlx`)
+> para latencia, RTX 3080 para fine-tuning y evaluación. Nada copiado de marketing de vendors.
+> Las comparaciones con Jev anteriores a v32b usaron el checkpoint oficial v10s (se conservan como registro histórico).
 
 | Métrica | Valor |
 |---|---|
@@ -38,7 +46,7 @@ localdecide doctor                  # diagnóstico de hardware + prueba de humo
 | Costo | **$0** |
 | Contenido de página enviado a servidores | **cero** |
 
-### v32b propio vs modelo oficial vs API de Jev (2026-09-25, mismo conjunto)
+### v32b propio (ahora por defecto) vs modelo oficial vs API de Jev (2026-09-25, mismo conjunto)
 
 | Benchmark | **v32b (propio)** | versión oficial | API Jev |
 |---|---:|---:|---:|
@@ -54,7 +62,7 @@ En la categoría local (gratis, offline), v32b gana en 6 de 8 benchmarks frente 
 
 ### Enfrentamiento contra el Jev oficial: datos medidos
 
-`examples/diagnostics/jev_head_to_head.py` (un paso) y `jev_flow_h2h.py` (flujos completos) ejecutan las mismas tareas contra el Laya v10s local y el jev-1.13.0 oficial:
+Estas baterías son anteriores a v32b; el lado local usaba el checkpoint oficial v10s de entonces (se conservan como registro histórico; v32b supera a v10s en 6 de 8 benchmarks, ver tabla superior). `examples/diagnostics/jev_head_to_head.py` (un paso) y `jev_flow_h2h.py` (flujos completos) ejecutan las mismas tareas contra el Laya v10s local y el jev-1.13.0 oficial:
 
 | Un paso, sin contexto (12 metas / 6 idiomas) | local v10s | Jev oficial |
 |---|---|---|

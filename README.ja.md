@@ -11,11 +11,12 @@
 
 決定モデルは状態について型付きの質問に答え、生成テキストではなく**較正された確率**を返します。テキストを生成しないため、指示を幻覚することはありません。ページ上の操作可能な要素の番号付きリストを渡すと、次に実行すべき操作と対象要素を教えてくれます。これがブラウザエージェントの「決定」部分に最適な形です。
 
-> **🚀 独自ファインチューン済みチェックポイント：8ベンチマーク中6つで公式モデルを上回る。**
-> **[ichenney/laya-browser-v32b](https://huggingface.co/ichenney/laya-browser-v32b)** は
-> holdout（**0.7125 vs 公式 0.425**）、MiniWoB（**0.9138 vs 0.6638**）、JevBench hard
-> （**0.4144 vs 0.243**）などで公式を凌駕し、3080 GPU で **27 ms/決定**（Jev API の 31 倍速）。
-> 切り替えは一行：`LayaTorchBackend(model="ichenney/laya-browser-v32b", subfolder="v32b")`
+> **🚀 独自チェックポイントがデフォルトに：8ベンチマーク中6つで公式を上回る。**
+> `model="browser"` は現在 **[ichenney/laya-browser-v32b](https://huggingface.co/ichenney/laya-browser-v32b)**
+> を読み込みます — holdout **0.7125 vs 公式 0.425**、MiniWoB **0.9138 vs 0.6638**、
+> JevBench hard **0.4144 vs 0.243**。3080 GPU で **27 ms/決定**（Jev API の 31 倍速）。
+> コード変更ゼロ、HF Hub から一度だけダウンロード、以後完全オフライン。
+> 公式チェックポイントを使う場合：`model="browser-legacy"`
 
 ## インストール
 
@@ -27,7 +28,14 @@ pip install 'laya-browser-agent[torch]'    # Linux / Windows / Intel Mac
 localdecide doctor                  # ハードウェア診断 + スモークテスト
 ```
 
+デフォルトの v32b チェックポイントは初回使用時に一度だけダウンロード（約 1.3 GB、
+公式 v10s に戻す `browser-legacy` は約 650 MB）。以後は完全オフラインで動作。
+
 ## 測定値（M4, 16 GB）
+
+> すべての数値は開発機で実測：Apple M4（16 GB, `laya-mlx`）で推論レイテンシ、
+> RTX 3080 でファインチューニングとバッチ評価。ベンダーのマーケティング数値の流用はなし。
+> v32b より前の Jev 比較は公式 v10s チェックポイント使用（歴史的記録として保持）。
 
 | 指標 | 値 |
 |---|---|
@@ -38,7 +46,7 @@ localdecide doctor                  # ハードウェア診断 + スモークテ
 | コスト | **$0** |
 | ページ内容の外部送信 | **なし** |
 
-### 独自 v32b vs 公式モデル vs Jev API（2026-09-25 実測、同一セット）
+### 独自 v32b（現デフォルト）vs 公式モデル vs Jev API（2026-09-25 実測、同一セット）
 
 | ベンチマーク | **v32b（独自）** | 公式ブラウザ版 | Jev API |
 |---|---:|---:|---:|
@@ -54,7 +62,7 @@ localdecide doctor                  # ハードウェア診断 + スモークテ
 
 ### 公式 Jev との対決：実測データ
 
-`examples/diagnostics/jev_head_to_head.py`（単発）と `jev_flow_h2h.py`（マルチステップ）で、同じタスクをローカル Laya v10s と公式 jev-1.13.0 に実行して比較：
+以下の対戦は v32b 登場前の実施で、ローカル側は当時の公式 v10s チェックポイント（歴史的記録として保持。v32b は 8 ベンチマーク中 6 つで v10s を上回る、上表参照）。`examples/diagnostics/jev_head_to_head.py`（単発）と `jev_flow_h2h.py`（マルチステップ）で、同じタスクをローカル Laya v10s と公式 jev-1.13.0 に実行して比較：
 
 | 単発・ゼロ文脈（12 問 / 6 言語） | ローカル v10s | 公式 Jev |
 |---|---|---|
