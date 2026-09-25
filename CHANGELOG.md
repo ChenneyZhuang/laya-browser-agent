@@ -3,6 +3,38 @@
 All notable changes to this project are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/); versioning follows [SemVer](https://semver.org/).
 
+## [0.3.1] - 2026-09-25
+
+### Changed
+- **`model="browser"` now loads the fine-tuned
+  [`ichenney/laya-browser-v32b`](https://huggingface.co/ichenney/laya-browser-v32b)
+  checkpoint by default** — verified end-to-end on Apple Silicon (load +
+  real decision through the MLX path). The upstream checkpoint stays one
+  flag away as `model="browser-legacy"`.
+- README overhaul in all four languages (en/zh/ja/es): install moved up,
+  honest three-way comparison tables (v32b / official / hosted Jev),
+  download-size notes updated for the 1.3 GB v32b default, historical
+  head-to-head sections labeled as v10s-era provenance.
+- Reference-sources table: `cklxx/laya-browser` is documented as the
+  fine-tuning base of the default checkpoint, not the default itself.
+
+## [0.3.0] - 2026-09-25
+
+### Added
+- Fine-tuned checkpoint release: **v32b-b15** — frozen-encoder head
+  fine-tune of `cklxx/laya-browser` published at
+  [`ichenney/laya-browser-v32b`](https://huggingface.co/ichenney/laya-browser-v32b).
+  Beats the official browser-tuned checkpoint on 6/8 benchmarks
+  (recovery2-holdout 0.7125 vs 0.425; MiniWoB-116 0.9138 vs 0.6638;
+  JevBench hard 0.4144 vs 0.243; injection_safety 0.75 vs 0.50).
+- `reports/v20/MULTIDIM_COMPARISON.md` — the full v17→v32 recipe,
+  per-family breakdowns, and the noul root-cause analysis.
+- `reports/v20/JEV_COMPARISON.md` — fresh 231-item head-to-head against
+  the hosted Jev API with the user's key (mean 0.8615 vs local 0.5325;
+  local wins `score` and `temporal_numeric` families, 31x faster).
+- Companion repo [laya-training-log](https://github.com/ChenneyZhuang/laya-training-log) —
+  every version, every failed path, all training scripts.
+
 ## [0.2.3] - 2026-09-24
 
 ### Fixed
