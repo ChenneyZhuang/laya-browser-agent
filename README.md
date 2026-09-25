@@ -539,6 +539,8 @@ never produced. Same license (Apache-2.0), same architecture, drop-in swap:
 Full methodology, per-family breakdowns, the noul root-cause analysis, and every
 eval JSON: [`reports/v20/MULTIDIM_COMPARISON.md`](reports/v20/MULTIDIM_COMPARISON.md)
 and [`reports/v20/JEV_COMPARISON.md`](reports/v20/JEV_COMPARISON.md).
+The complete training story — every version, every failed path, all scripts —
+lives in the companion repo **[laya-training-log](https://github.com/ChenneyZhuang/laya-training-log)**.
 
 To use it: `LayaTorchBackend(model="ichenney/laya-browser-v32b", subfolder="v32b")`.
 
