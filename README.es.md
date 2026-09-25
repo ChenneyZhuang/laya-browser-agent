@@ -6,8 +6,8 @@
 
 **Decisiones de agente de navegador impulsadas por Laya — el modelo System 1 de código abierto. Una alternativa local a TypeSafe Jev: sin nube, sin clave de API, sin capturas de pantalla.**
 
-[![tests](https://github.com/ChenneyZhuang/laya-browser-agent/actions/workflows/tests.yml)](https://github.com/ChenneyZhuang/laya-browser-agent/actions/workflows/tests.yml)
-[![HuggingFace](https://img.shields.io/badge/🤗-ichenney/laya-browser--v32b-yellow)](https://huggingface.co/ichenney/laya-browser-v32b)
+[![tests](https://github.com/ChenneyZhuang/laya-browser-agent/actions/workflows/tests.yml/badge.svg)](https://github.com/ChenneyZhuang/laya-browser-agent/actions/workflows/tests.yml/badge.svg)
+[![HuggingFace](https://img.shields.io/badge/%F0%9F%A4%97-ichenney%2Flaya--browser--v32b-yellow)](https://huggingface.co/ichenney/laya-browser-v32b)
 
 Un modelo de decisión responde preguntas tipadas sobre un estado y devuelve **probabilidades calibradas** en lugar de texto generado — por lo que no puede alucinar una instrucción. Esta es exactamente la forma correcta para la parte de *decidir* de un agente de navegador: dale una tabla numerada de los controles de una página y te dirá qué operación ejecutar y sobre qué elemento.
 

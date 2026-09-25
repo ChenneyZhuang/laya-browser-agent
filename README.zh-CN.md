@@ -6,9 +6,9 @@
 
 **浏览器 agent 决策，由 Laya 驱动 —— 开源的 System 1 模型。TypeSafe Jev 的本地开源替代：无云端、无 API key、无截图。**
 
-[![tests](https://github.com/ChenneyZhuang/laya-browser-agent/actions/workflows/tests.yml)](https://github.com/ChenneyZhuang/laya-browser-agent/actions/workflows/tests.yml)
+[![tests](https://github.com/ChenneyZhuang/laya-browser-agent/actions/workflows/tests.yml/badge.svg)](https://github.com/ChenneyZhuang/laya-browser-agent/actions/workflows/tests.yml/badge.svg)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![HuggingFace](https://img.shields.io/badge/🤗-ichenney/laya-browser--v32b-yellow)](https://huggingface.co/ichenney/laya-browser-v32b)
+[![HuggingFace](https://img.shields.io/badge/%F0%9F%A4%97-ichenney%2Flaya--browser--v32b-yellow)](https://huggingface.co/ichenney/laya-browser-v32b)
 
 决策模型对状态回答结构化问题，返回**校准过的概率**而非生成的文字——因此它不可能幻觉出一条指令。这正是浏览器 agent "决定"那一半的理想形态：给它一张页面上可交互元素的编号表，它告诉你下一步该执行什么操作、作用于哪个元素。
 

@@ -4,9 +4,9 @@
 
 **[English](README.md)** | [中文](README.zh-CN.md) | [日本語](README.ja.md) | [Español](README.es.md)
 
-[![tests](https://github.com/ChenneyZhuang/laya-browser-agent/actions/workflows/tests.yml/badge.svg)](https://github.com/ChenneyZhuang/laya-browser-agent/actions/workflows/tests.yml)
+[![tests](https://github.com/ChenneyZhuang/laya-browser-agent/actions/workflows/tests.yml/badge.svg)](https://github.com/ChenneyZhuang/laya-browser-agent/actions/workflows/tests.yml/badge.svg)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![HuggingFace](https://img.shields.io/badge/🤗-ichenney/laya-browser--v32b-yellow)](https://huggingface.co/ichenney/laya-browser-v32b)
+[![HuggingFace](https://img.shields.io/badge/%F0%9F%A4%97-ichenney%2Flaya--browser--v32b-yellow)](https://huggingface.co/ichenney/laya-browser-v32b)
 ![GitHub release](https://img.shields.io/github/v/tag/ChenneyZhuang/laya-browser-agent)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![Runs on](https://img.shields.io/badge/runs%20on-Apple%20Silicon%20%7C%20CUDA%20%7C%20CPU-black)
