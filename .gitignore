@@ -45,6 +45,11 @@ reports/*
 reports/v20/*
 !reports/v20/MULTIDIM_COMPARISON.md
 !reports/v20/JEV_COMPARISON.md
+!reports/v37/
+reports/v37/*
+!reports/v37/README.md
+!reports/v37/*.py
+!reports/v37/*.sh
 
 # nested independent repos (laya-training-log, profile README)
 laya-training-log/
