@@ -392,12 +392,14 @@ class TestFlows(unittest.TestCase):
         """
         result = self._flow("Click the 'Reveal more options' button so the hidden panel appears.")
         self.assertTrue(result.get("ok"), result.get("error"))
-        # A confidence refusal is a legitimate outcome on an ambiguous fixture: the guard
-        # exists so an unsure model does not act. What must never happen is a crash, or a
-        # click on something unrelated.
+        # A guard refusal is a legitimate outcome on an ambiguous fixture: the guards
+        # exist so an unsure or mistargeted model does not act. Two refusals can end the
+        # run - the confidence gate ("confident") or the empty-submit guard ("still
+        # empty"). What must never happen is a crash, or a click on something unrelated.
         if result["stopped"] == "error":
-            self.assertIn("confident", result.get("error") or "",
-                          f"unexpected error: {result.get('error')}")
+            error = result.get("error") or ""
+            self.assertTrue("confident" in error or "still empty" in error,
+                            f"unexpected error: {error}")
             self.assertEqual(result["summary"]["executed"], 0,
                              "an error must not have executed anything")
             return
@@ -438,13 +440,18 @@ class TestFlows(unittest.TestCase):
         )
         self.assertFalse(submitted_empty,
                          f"fired the submit before filling the field: {executed_clicks}")
-        # Either it typed (correct flow), or the confidence guard refused the submit and the
-        # run stopped without executing anything (safe). Both are acceptable; firing the
-        # empty submit was the one outcome that mattered.
+        # Either it typed (correct flow), or a guard refused the submit and the run
+        # stopped without executing anything (safe). Both are acceptable; firing the
+        # empty submit was the one outcome that mattered. Two guards can produce the
+        # refusal: the confidence gate ("below") on an unsure model, and the
+        # empty-submit guard ("still empty") on a confident one (the v32b default
+        # proposes the empty submit at p=0.74, so the gate never fires for it).
         typed = any(op == "TYPE_TEXT" for op in operations)
-        refused = any("below" in (step.get("detail") or "") for step in result["steps"])
+        refused = any(("below" in (step.get("detail") or ""))
+                      or ("still empty" in (step.get("detail") or ""))
+                      for step in result["steps"])
         self.assertTrue(typed or refused or result["stopped"] == "done",
-                        f"expected a TYPE_TEXT or a confidence refusal; ops={operations} "
+                        f"expected a TYPE_TEXT or a guard refusal; ops={operations} "
                         f"error={result.get('error')}")
 
     def test_scope_never_hides_a_goal_match_on_a_real_page(self):

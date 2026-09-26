@@ -672,6 +672,90 @@ class TestConfidenceGate(unittest.TestCase):
         self.assertEqual(driver2.executed, [("CLICK", "1", None)], "a low threshold must allow it")
 
 
+class TestEmptySubmitGuard(unittest.TestCase):
+    """The harness refuses to fire a submit/search while its field is still empty.
+
+    Measured on the v32b default checkpoint: asked to "Search products for 'kettle'",
+    the model answers CLICK on the Search button at p=0.74 with the field still empty -
+    confidently, so the confidence gate never fires. The old default (v10s) only
+    escaped because its confidence on the same state was 0.06. Safety must not depend
+    on a coin flip, so the guard checks the proposal's real effect: submit-like click +
+    still-empty paired field = refused. Two refusals end the run (the model re-proposes
+    instead of adapting; measured).
+    """
+
+    def observation(self):
+        return {"url": "https://x", "title": "Flow Shop", "text": "Step 1 — Find a product", "actions": [
+            {"kind": "fill", "node": "q", "label": "Search products", "role": "searchbox",
+             "current_value": ""},
+            {"kind": "click", "node": "s", "label": "Search", "role": "button"},
+        ]}
+
+    def test_empty_submit_is_refused(self):
+        backend = _SequenceBackend([
+            {"operation": "CLICK", "click_target": "2"},   # the empty submit
+            {"operation": "TYPE_TEXT", "type_text_target": "1"},  # recovery: fill the field
+        ])
+        driver = FakeDriver([self.observation()])
+        run = BrowserDecider(decider=Decider(backend=backend, retries=0),
+                             text_provider=lambda goal, element: "kettle", max_steps=3).run(
+            driver, "Search products for 'kettle' and then show the results.")
+        self.assertNotIn(("CLICK", "2", None), driver.executed,
+                         "the empty submit must never execute")
+        refused = [s for s in run.steps if "still empty" in s.detail]
+        self.assertTrue(refused, f"expected a refusal step; got {[s.detail for s in run.steps]}")
+
+    def test_two_refusals_end_the_run_instead_of_thrashing(self):
+        backend = _SequenceBackend([{"operation": "CLICK", "click_target": "2"}] * 5)
+        driver = FakeDriver([self.observation()])
+        run = BrowserDecider(decider=Decider(backend=backend, retries=0), max_steps=5).run(
+            driver, "Search products for 'kettle'.")
+        self.assertEqual(driver.executed, [], "nothing may execute")
+        self.assertEqual(run.stopped, "error")
+        self.assertIn("still empty", run.error)
+
+    def test_submit_after_filling_the_field_goes_through(self):
+        """The guard must not block the legitimate flow: fill, then submit."""
+        filled = {"url": "https://x", "title": "Flow Shop", "text": "", "actions": [
+            {"kind": "fill", "node": "q", "label": "Search products", "role": "searchbox",
+             "current_value": "kettle"},
+            {"kind": "click", "node": "s", "label": "Search", "role": "button"},
+        ]}
+        backend = _SequenceBackend([{"operation": "CLICK", "click_target": "2"}, {"operation": "DONE"}])
+        driver = FakeDriver([filled])
+        run = BrowserDecider(decider=Decider(backend=backend, retries=0), max_steps=2).run(
+            driver, "Search products for 'kettle'.")
+        self.assertEqual(driver.executed, [("CLICK", "2", None)],
+                         "a filled field must allow the submit")
+
+    def test_submit_word_without_a_paired_empty_field_is_not_blocked(self):
+        """No still-empty paired field = no refusal. A 'Search' button on a page where
+        no editable field is offered (or all are filled) must go through."""
+        observation = {"url": "https://x", "title": "Results", "text": "", "actions": [
+            {"kind": "click", "node": "s", "label": "Search", "role": "button"},
+            {"kind": "click", "node": "d", "label": "All results", "role": "link"},
+        ]}
+        backend = _SequenceBackend([{"operation": "CLICK", "click_target": "1"}, {"operation": "DONE"}])
+        driver = FakeDriver([observation])
+        run = BrowserDecider(decider=Decider(backend=backend, retries=0), max_steps=2).run(
+            driver, "Run the search again.")
+        self.assertEqual(driver.executed, [("CLICK", "1", None)],
+                         "no empty field in play - the guard must stand down")
+
+    def test_non_submit_words_are_never_blocked(self):
+        """'Continue shopping' / 'Next page' style browsing controls are not submits."""
+        observation = {"url": "https://x", "title": "T", "text": "", "actions": [
+            {"kind": "click", "node": "c", "label": "Continue shopping", "role": "button"},
+            {"kind": "fill", "node": "q", "label": "Search products", "role": "searchbox",
+             "current_value": ""},
+        ]}
+        backend = _SequenceBackend([{"operation": "CLICK", "click_target": "1"}, {"operation": "DONE"}])
+        driver = FakeDriver([observation])
+        run = BrowserDecider(decider=Decider(backend=backend, retries=0), max_steps=2).run(
+            driver, "Keep browsing the shop.")
+        self.assertEqual(driver.executed, [("CLICK", "1", None)])
+
+
 
 
 class TestGrounding(unittest.TestCase):

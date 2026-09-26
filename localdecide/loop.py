@@ -16,12 +16,13 @@ The loop is driver-agnostic on purpose: pass any object with
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Protocol
 
 from .decider import Decider
 from .page import build_element_table, table_to_questions
-from .scope import Scope
+from .scope import Scope, goal_tokens
 
 
 class Driver(Protocol):
@@ -300,6 +301,30 @@ class BrowserDecider:
                                         "text": None, "page_changed": False})
                         continue
 
+                # Empty-submit guard: same pattern (the model proposes, the harness checks
+                # the proposal's real effect). A CLICK on a submit-like control while the
+                # field it plainly pairs with is still empty would fire a search/commit
+                # with nothing in it - refused, and the model asks again with the fresh
+                # observation. The confidence gate is not a substitute: this failure mode
+                # arrives *confidently* (measured p=0.74 on v32b). Two refusals in one run
+                # means the model is not adapting (measured: it re-proposes the click);
+                # stop with a clear error instead of burning the step budget.
+                if operation == "CLICK" and element is not None and self._looks_like_submit(element.label):
+                    empty_field = self._empty_paired_field(table, element.label, goal)
+                    if empty_field is not None:
+                        run.steps.append(Step(number, operation, target, element.label,
+                                              confidence, decision.latency_ms, False,
+                                              detail=f"refused: would submit with '{empty_field.label}' still empty"))
+                        self._emit(run.steps[-1])
+                        history.append({"action": operation, "kind": "click", "target": target,
+                                        "text": None, "page_changed": False})
+                        empty_refusals = sum(1 for s in run.steps if "still empty" in s.detail)
+                        if empty_refusals >= 2:
+                            run.stopped, run.error = "error", (
+                                f"model keeps proposing a submit with '{empty_field.label}' still empty")
+                            return run
+                        continue
+
                 text: Optional[str] = None
                 if operation == "TYPE_TEXT":
                     if self.text_provider is None:
@@ -423,3 +448,46 @@ class BrowserDecider:
                 self.on_step(step)
             except Exception:
                 pass
+
+    # ── empty-submit guard ───────────────────────────────────────────────────
+    # Measured (v32b default checkpoint, live flow): shown a search page whose text
+    # echoes the field and button names, the model answers CLICK on the submit at
+    # p=0.74 while its search field is still empty. The older default only escaped
+    # this because its confidence (0.06) tripped the confidence gate - the safety
+    # was luck, not structure. A confident wrong submit is precisely what the
+    # confidence gate does NOT catch, so the harness checks the proposal's real
+    # effect instead: a click on a submit-like control while the field it plainly
+    # belongs to is still empty is refused, and the model is asked again.
+
+    # Words that mark a control as "commit the form / search" rather than browse.
+    _SUBMIT_WORDS = frozenset({
+        "search", "submit", "send", "sign", "log", "register", "subscribe",
+        "checkout", "pay", "confirm", "save", "apply", "create",
+    })
+
+    @staticmethod
+    def _words(text: str) -> set:
+        return {word for word in re.findall(r"[a-z0-9']+", (text or "").lower()) if len(word) > 2}
+
+    def _looks_like_submit(self, label: str) -> bool:
+        return bool(self._words(label) & self._SUBMIT_WORDS)
+
+    def _empty_paired_field(self, table, submit_label: str, goal: str):
+        """The still-empty field a submit-like click would fire with, or None.
+
+        Paired = the field shares a word with the control ("Search" + "Search
+        products") or with the goal ("search products for 'kettle'"). Deliberately
+        narrow: a false positive here would block a legitimate click, so an odd
+        naming may slip through - documented in README, Limitation.
+        """
+        submit_words = self._words(submit_label)
+        goal_words = set(goal_tokens(goal))
+        for element in table.elements:
+            if "TYPE_TEXT" not in (element.operations or []):
+                continue
+            if (element.value or "").strip() or element.disabled:
+                continue
+            field_words = self._words(element.label)
+            if (submit_words & field_words) or (goal_words & field_words):
+                return element
+        return None

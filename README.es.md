@@ -101,7 +101,7 @@ La fila de phishing merece atención: v10s local dio p=0.14 a la estafa clásica
 Conclusión práctica de las cuatro baterías: precisión y calibración de seguridad → Jev oficial; latencia (10-20x más rápido), privacidad o volumen gratuito → local + guards. El grounding chino, el phishing y la contención son exactamente los ejes a afinar con el fine-tuning.
 ## Relación con Jev y Laya
 
-Si has leído sobre el modelo "System One" de Jev y quieres la misma idea — decisiones tipadas y calibradas en lugar de texto generado — ejecutándose localmente para tus agentes de navegador, este es el proyecto. Ejecuta el checkpoint de Laya afinado para navegadores y añade lo que ninguno de los dos proyectos incluye: observación de tabla de elementos, validación de respuestas, puerta de confianza, guardias de bucle y un servidor compatible con TypeSafe.
+Si has leído sobre el modelo "System One" de Jev y quieres la misma idea — decisiones tipadas y calibradas en lugar de texto generado — ejecutándose localmente para tus agentes de navegador, este es el proyecto. Ejecuta el checkpoint de Laya afinado para navegadores y añade lo que ninguno de los dos proyectos incluye: observación de tabla de elementos, validación de respuestas, puerta de confianza, guardia de envío vacío, guardias de bucle y un servidor compatible con TypeSafe.
 
 ## Limitaciones conocidas
 
