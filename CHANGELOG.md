@@ -3,6 +3,29 @@
 All notable changes to this project are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/); versioning follows [SemVer](https://semver.org/).
 
+## [0.3.2] - 2026-09-26
+
+### Added
+- **Empty-submit guard.** Found by A/B-testing the new default checkpoint: asked to
+  "Search products for 'kettle'", v32b answers `CLICK` on the Search button at
+  **p=0.74 with the field still empty** — the confidence gate cannot catch a
+  confident wrong proposal, and the older v10s default only escaped because its own
+  confidence on the same state was 0.06 (safety by accident, not structure). The
+  guard refuses a click on a submit-like control (search / submit / send / sign-in /
+  checkout / …) while the still-empty field it plainly pairs with; the model is
+  asked again, and two refusals end the run with a clear error instead of burning
+  the step budget. Filling the field first makes the same click go through.
+- 5 contract tests for the guard: refusal, two-strike stop, filled-field
+  pass-through, submit-word-without-empty-field stands down, non-submit words
+  never blocked.
+- Live suite: 34/34 on v32b AND 34/34 on browser-legacy (regression-free). The
+  search-flow and reveal-flow tests now accept both guard refusals (confidence gate
+  or empty-submit guard) — a safe stop either way, as the tests always intended.
+
+### Changed
+- READMEs (en/zh/ja/es): the empty-submit failure and its guard documented in the
+  "things the model gets wrong" table (en) and the key-design guard lists (zh/ja/es).
+
 ## [0.3.1] - 2026-09-25
 
 ### Changed
