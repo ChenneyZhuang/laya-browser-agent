@@ -48,6 +48,7 @@ reports/v20/*
 !reports/v37/
 reports/v37/*
 !reports/v37/README.md
+!reports/v37/PROBE_RESULTS.md
 !reports/v37/*.py
 !reports/v37/*.sh
 
