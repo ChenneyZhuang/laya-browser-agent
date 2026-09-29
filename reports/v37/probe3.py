@@ -104,15 +104,15 @@ def run(ckpt, items):
                 row[f"{tag}_p"] = round(pm, 3)
 
             # target question (deploy JSONL), once, gated on the arm's op
-            def resolve_target(op):
+            def resolve_target(op, item=x, item_state=state):
                 if op not in ("CLICK", "TYPE_TEXT", "SELECT"):
                     return None
                 qid = f"{op.lower()}_target"
-                if qid not in x["questions"]:
+                if qid not in item["questions"]:
                     return None
-                tq = x["questions"][qid]
-                tpick, _ = answer(model, tok, cfg, state, json.dumps(tq["instructions"], ensure_ascii=False), tq["criteria"])
-                return x["index_labels"].get(str(tpick))
+                tq = item["questions"][qid]
+                tpick, _ = answer(model, tok, cfg, item_state, json.dumps(tq["instructions"], ensure_ascii=False), tq["criteria"])
+                return item["index_labels"].get(str(tpick))
 
             if x["suite"] == "pick":
                 exp = x.get("expected_op_semantic", "CLICK")
@@ -127,8 +127,8 @@ def run(ckpt, items):
                 want = x["expected_operation"]
                 for tag in ("A", "B8", "B7"):
                     row[f"{tag}_ok"] = row[f"{tag}_op"] == want
-        except Exception as e:
-            print(f"! {x['slug']}: {type(e).__name__}: {e}", flush=True)
+        except Exception as error:
+            print(f"! {x['slug']}: {type(error).__name__}: {error}", flush=True)
             for tag in ("A", "B8", "B7"):
                 row.setdefault(f"{tag}_op", None)
                 row.setdefault(f"{tag}_pick_ok", False)
@@ -160,7 +160,7 @@ if __name__ == "__main__":
         print(f"########## {ckpt} ##########", flush=True)
         try:
             per = run(ckpt, items)
-        except Exception as e:
+        except Exception:
             import traceback
             traceback.print_exc()
             continue

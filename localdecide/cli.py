@@ -26,6 +26,13 @@ def _load_json(path: str) -> Any:
         return json.load(handle)
 
 
+def _print_install_instructions(extra: str) -> None:
+    """Print install steps that work before the project has a PyPI release."""
+    print("  git clone https://github.com/ChenneyZhuang/laya-browser-agent")
+    print("  cd laya-browser-agent")
+    print(f"  pip install -e '.[{extra}]'")
+
+
 def cmd_doctor(args: argparse.Namespace) -> int:
     import importlib.util
     import platform
@@ -63,16 +70,18 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     # and telling people plainly beats letting them discover it by crash.
     if system == "Darwin" and machine == "arm64" and not (have_mlx or have_torch):
         print("\nNo local decision runtime yet. On this Mac:")
-        print("  pip install 'localdecide[mlx]'      # fastest path on Apple Silicon")
+        _print_install_instructions("mlx")
     elif system == "Darwin" and machine == "x86_64" and not (have_mlx or have_torch):
         print("\nNo local decision runtime yet. This is an Intel Mac - use the PyTorch runtime:")
-        print("  pip install 'localdecide[torch]'    # laya-mlx does not run on Intel Macs")
+        _print_install_instructions("torch")
+        print("  (laya-mlx does not run on Intel Macs)")
     elif system == "Windows" and not (have_mlx or have_torch):
         print("\nNo local decision runtime yet. On Windows:")
-        print("  pip install 'localdecide[torch]'")
+        _print_install_instructions("torch")
     elif system == "Linux" and not (have_mlx or have_torch):
         print("\nNo local decision runtime yet. On Linux:")
-        print("  pip install 'localdecide[torch]'    # add CUDA torch if you have a GPU")
+        _print_install_instructions("torch")
+        print("  Add a CUDA-enabled PyTorch build if you have an NVIDIA GPU.")
 
     if memory_gb is not None and memory_gb < 10 and (have_mlx or have_torch):
         print(f"\nnote: {memory_gb} GB is tight for a 650 MB checkpoint plus a browser. "

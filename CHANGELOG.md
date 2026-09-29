@@ -3,6 +3,21 @@
 All notable changes to this project are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/); versioning follows [SemVer](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+- `HEAD` responses no longer write a JSON body onto a persistent HTTP connection; a regression test sends `HEAD` and then `GET` on the same socket.
+- The Jev wire-compatibility test now starts an ephemeral local server with a deterministic fake backend. It no longer fails with connection-refused when port 8791 is not manually running, and it is suitable for CI.
+- `run_live_batched.sh` now fails fast when a pytest batch fails. It previously used `set -u` only, so a failed pytest piped through `tail` could be reported as a successful live run; a regression test now stubs a failing batch and checks the script exits nonzero immediately.
+- `localdecide doctor` now prints install steps that work before the package is published to PyPI; it no longer recommends the nonexistent `localdecide[extra]` distribution.
+- README install commands in all four languages now match the current Git-clone/editable-install workflow; PyPI availability was checked and the package is not published yet.
+- The body-size test now sends an oversized `Content-Length` and asserts the exact 413 response instead of sending a small body and accepting either 413 or 422.
+- Removed an identical duplicate `open_kickoff` goal entry in the v37 generator; bound loop data explicitly in its probes.
+
+### Changed
+- CI now runs the model-free Jev-wire and CLI install-guidance tests, and pins Ruff to the version already observed on GitHub Actions (`0.16.9`).
+- Build metadata uses the SPDX `Apache-2.0` expression (PEP 639) and requires setuptools 77+, removing the license deprecation warnings observed during wheel/sdist builds.
+
 ## [0.3.2] - 2026-09-26
 
 ### Added

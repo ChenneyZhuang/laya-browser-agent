@@ -204,8 +204,8 @@ def resolve_backend(spec: Any = None, **kwargs: Any) -> Backend:
             return LayaTorchBackend(**kwargs)
         raise BackendError(
             "no_backend",
-            "No local decision runtime found. Apple Silicon: pip install 'localdecide[mlx]'. "
-            "Other platforms: pip install 'localdecide[torch]'.",
+            "This package is not published on PyPI yet. Clone https://github.com/ChenneyZhuang/laya-browser-agent and from its root run "
+            "pip install -e '.[mlx]' (Apple Silicon) or pip install -e '.[torch]' (other platforms).",
         )
     if isinstance(spec, str) and spec.startswith(("http://", "https://")):
         return HTTPBackend(spec, **kwargs)

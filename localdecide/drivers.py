@@ -129,7 +129,7 @@ class _BaseDriver:
 
 
 class PlaywrightDriver(_BaseDriver):
-    """Drive a browser with Playwright. `pip install localdecide[playwright]`.
+    """Drive a browser with Playwright. From the repository root: `pip install -e '.[playwright]'`.
 
     headless=False is usually the right choice while you are getting a flow working:
     you want to watch what the decisions actually do.

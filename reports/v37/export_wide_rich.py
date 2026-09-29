@@ -31,7 +31,7 @@ def load_bench():
 
 def main() -> int:
     sys.path.insert(0, str(REPO))
-    from localdecide import build_element_table, table_to_questions
+    from localdecide import build_element_table
 
     bw = load_bench()
     src = HERE / "wide_items.jsonl"

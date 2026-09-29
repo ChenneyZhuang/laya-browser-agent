@@ -20,12 +20,12 @@ Un modelo de decisión responde preguntas tipadas sobre un estado y devuelve **p
 
 ## Instalación
 
-> **Nota de instalación**: la versión en PyPI está alcanzando al repo. Por ahora usa `git clone https://github.com/ChenneyZhuang/laya-browser-agent && cd laya-browser-agent && pip install -e '.[all]'` (Apple Silicon) o `.[torch]` (resto).
+> **Nota de instalación**: el paquete aún no está publicado en PyPI. Primero clona el repositorio e instala desde su raíz: `git clone https://github.com/ChenneyZhuang/laya-browser-agent && cd laya-browser-agent`.
 
 ```bash
-pip install 'laya-browser-agent[mlx]'      # Apple Silicon
-pip install 'laya-browser-agent[torch]'    # Linux / Windows / Intel Mac
-localdecide doctor                  # diagnóstico de hardware + prueba de humo
+pip install -e '.[mlx]'      # Apple Silicon
+pip install -e '.[torch]'    # Linux / Windows / Intel Mac
+localdecide doctor           # diagnóstico de hardware + prueba de humo
 ```
 
 El checkpoint v32b por defecto se descarga una sola vez (~1,3 GB; el `browser-legacy`

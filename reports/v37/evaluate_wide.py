@@ -25,18 +25,18 @@ import json
 import os
 import sys
 import time
-from collections import Counter, defaultdict
+from collections import Counter
 from pathlib import Path
 
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
-import torch  # noqa: E402
+import torch
 
 try:
     torch.backends.python_native.disable_operations("bmm")
 except Exception:
     pass
 
-import laya  # noqa: E402
+import laya
 
 
 def main() -> int:

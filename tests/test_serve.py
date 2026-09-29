@@ -13,6 +13,7 @@ under a second.
 
 from __future__ import annotations
 
+import http.client
 import json
 import threading
 import unittest
@@ -21,7 +22,7 @@ import urllib.request
 from http.server import ThreadingHTTPServer
 
 from localdecide.decider import Decider
-from localdecide.serve import Handler, _State
+from localdecide.serve import Handler, MAX_BODY_BYTES, _State
 
 
 class _StaticBackend:
@@ -123,10 +124,20 @@ class TestHTTPService(unittest.TestCase):
         self.assertTrue(body["ok"])
         self.assertEqual(body["backend"], "static-test")
 
-    def test_head_healthz(self):
-        status, headers, body = _request(self.httpd, "/healthz", method="HEAD")
-        self.assertEqual(status, 200)
-        self.assertEqual(body, {})
+    def test_head_healthz_does_not_poison_keep_alive_connection(self):
+        connection = http.client.HTTPConnection("127.0.0.1", self.httpd.server_address[1], timeout=10)
+        connection.request("HEAD", "/healthz")
+        head_response = connection.getresponse()
+        self.assertEqual(head_response.status, 200)
+        self.assertEqual(head_response.read(), b"")
+
+        # A HEAD response must not leave its representation body on the persistent
+        # connection; otherwise it becomes garbage before the next response status line.
+        connection.request("GET", "/healthz")
+        get_response = connection.getresponse()
+        self.assertEqual(get_response.status, 200)
+        self.assertTrue(json.loads(get_response.read())["ok"])
+        connection.close()
 
     def test_head_unknown_is_404(self):
         status, _, _ = _request(self.httpd, "/definitely-not-here", method="HEAD")
@@ -177,10 +188,17 @@ class TestHTTPService(unittest.TestCase):
         self.assertEqual(status, 413)
 
     def test_oversized_body_rejected(self):
-        status, _, body = _request(self.httpd, "/v1/decide", method="POST",
-                                   body={"state": "x" * 10, "questions": {}})
-        # small real body; simulate the limit through the header path instead
-        self.assertIn(status, (413, 422))
+        connection = http.client.HTTPConnection("127.0.0.1", self.httpd.server_address[1], timeout=10)
+        connection.putrequest("POST", "/v1/decide")
+        connection.putheader("Content-Type", "application/json")
+        connection.putheader("Content-Length", str(MAX_BODY_BYTES + 1))
+        connection.endheaders()
+        response = connection.getresponse()
+        body = json.loads(response.read())
+        self.assertEqual(response.status, 413)
+        self.assertEqual(body["error"], "bad body length")
+        self.assertEqual(response.getheader("Access-Control-Allow-Origin"), "*")
+        connection.close()
 
     def test_invalid_json_400(self):
         url = f"http://127.0.0.1:{self.httpd.server_address[1]}/v1/decide"

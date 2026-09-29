@@ -25,17 +25,17 @@
 
 ## 安装
 
-> **安装提示**：PyPI 版本正在跟进仓库。当前请用 `git clone https://github.com/ChenneyZhuang/laya-browser-agent && cd laya-browser-agent && pip install -e '.[all]'` 安装（Apple Silicon 用 `[all]`，其他平台用 `[torch]`）。
+> **安装提示**：项目尚未发布到 PyPI。请先克隆仓库，再从项目根目录安装：`git clone https://github.com/ChenneyZhuang/laya-browser-agent && cd laya-browser-agent`。
 
 ```bash
 # Apple Silicon（MLX，最快路径）
-pip install 'laya-browser-agent[mlx]'
+pip install -e '.[mlx]'
 
-# Linux / Windows / Intel Mac（同样权重，PyTorch 运行时）
-pip install 'laya-browser-agent[torch]'
+# Linux / Windows / Intel Mac（PyTorch 运行时）
+pip install -e '.[torch]'
 
 # 浏览器驱动
-pip install 'laya-browser-agent[playwright]' && playwright install chromium
+pip install -e '.[playwright]' && playwright install chromium
 ```
 
 自检（自动识别芯片与内存，并做一次真实决策的冒烟测试）：

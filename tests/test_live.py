@@ -3,7 +3,8 @@
 These are the "does it actually work" tests, as distinct from `test_contract.py` which
 verifies the harness rules with a fake backend. They need:
 
-    pip install 'localdecide[all]' && playwright install chromium
+    git clone https://github.com/ChenneyZhuang/laya-browser-agent && cd laya-browser-agent
+    pip install -e '.[all]' && playwright install chromium
 
 and they download the browser checkpoint on first run. Run them with:
 

@@ -12,7 +12,7 @@ jobs:
   # The matrix is the "simulate below-M4 and everything else" answer: x86 Linux,
   # Windows, Intel macOS and Apple Silicon all run the same pure-Python harness, which
   # is exactly the code that must behave identically everywhere. Oldest and newest
-  # Python are both covered because 3.9 vs 3.13 differ in ways that matter (typing,
+  # Python are both covered because 3.10 vs 3.13 differ in ways that matter (typing,
   # importlib, dataclass behaviour).
   contract:
     strategy:
@@ -52,11 +52,11 @@ jobs:
         shell: python
       - name: Contract tests
         run: python -m pytest tests/test_contract.py -q -p no:cacheprovider
-      - name: HTTP service + MCP tests (no checkpoint needed)
-        run: python -m pytest tests/test_serve.py tests/test_mcp.py -q -p no:cacheprovider
+      - name: HTTP service + MCP + CLI + Jev wire tests (no checkpoint needed)
+        run: python -m pytest tests/test_serve.py tests/test_mcp.py tests/test_jev_compat.py tests/test_cli.py tests/test_scripts.py -q -p no:cacheprovider
       - name: Lint (correctness rules)
         run: |
-          pip install ruff
+          pip install ruff==0.16.9
           ruff check .
       - name: Memory-safety rules
         run: python -m pytest tests/test_live.py::TestMemorySafety -q -p no:cacheprovider

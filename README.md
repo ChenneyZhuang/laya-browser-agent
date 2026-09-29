@@ -226,9 +226,7 @@ into a table your code built.
 
 ### Step by step
 
-**1. Install the package with the extras for your platform.** Install from a
-git clone (the PyPI release is catching up to the repo; if `pip install
-laya-browser-agent` works for you, prefer it):
+**1. Install the package with the extras for your platform.** There is no PyPI release yet, so clone the repository and install from its root:
 
 ```bash
 git clone https://github.com/ChenneyZhuang/laya-browser-agent && cd laya-browser-agent
@@ -243,16 +241,14 @@ pip install -e '.[torch]'
 pip install -e '.[torch]'
 ```
 
-(Once the package is on PyPI, `pip install 'laya-browser-agent[mlx]'` /
-`[torch]` will be the one-liner. `localdecide` is the import and CLI name on
-both paths.)
+`localdecide` is the import and CLI name when installed from the repository.
 
 **2. Install a browser driver (only needed for the browser loop):**
 
 ```bash
-pip install 'laya-browser-agent[playwright]' && playwright install chromium
+pip install -e '.[playwright]' && playwright install chromium
 # Or attach to a Chrome you already have open and logged in — no download:
-pip install 'laya-browser-agent[cdp]'
+pip install -e '.[cdp]'
 ```
 
 **3. Run the hardware check.** `doctor` detects your chip and memory, picks the right
@@ -380,7 +376,7 @@ the chrome filter, whatever it looks like — because "Random article" is a navi
 ### 3. As an MCP server for Claude Desktop, Cursor, and friends
 
 ```bash
-pip install 'laya-browser-agent[mlx]'   # or [torch]
+pip install -e '.[mlx]'   # or [torch]
 localdecide-mcp
 ```
 
@@ -870,8 +866,8 @@ one is runnable, and each answers a specific question:
 ## Troubleshooting
 
 **`localdecide doctor` says "No local decision runtime yet"**
-Install the extras for your platform: `pip install 'laya-browser-agent[mlx]'` on Apple Silicon,
-`pip install 'laya-browser-agent[torch]'` everywhere else. Then run doctor again — it now runs a
+Install the extras for your platform: `pip install -e '.[mlx]'` on Apple Silicon,
+`pip install -e '.[torch]'` everywhere else. Then run doctor again — it now runs a
 one-decision smoke test, so "OK" means the checkpoint loaded and answered.
 
 **First decision is slow (~10 s)**

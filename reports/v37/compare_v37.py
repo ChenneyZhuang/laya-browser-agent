@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import json
 import pathlib
-from collections import Counter
 
 LOGS = pathlib.Path("/mnt/d/v37/logs")
 D = pathlib.Path("/mnt/d/Jev-Training")

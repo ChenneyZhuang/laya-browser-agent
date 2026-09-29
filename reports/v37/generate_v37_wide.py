@@ -372,7 +372,6 @@ GOALS = {
     "new_event": ["Create a new calendar event.", "Add a calendar event.", "Make a new event on the calendar."],
     "today": ["Jump to today's date.", "Go to today.", "Show today on the calendar."],
     "search_calendar": ["Search the calendar.", "Search the calendar for 'standup'.", "Find an event by searching the calendar."],
-    "open_kickoff": ["Open the Allcare Homes kickoff event.", "Show me the Allcare Homes kickoff.", "Open the kickoff event on Tuesday."],
     "new_contact": ["Create a new contact.", "Add a contact.", "Make a new contact entry."],
     "import_contacts": ["Import contacts from a file.", "Bring contacts in from a file.", "Import my contacts from a CSV."],
     "search_contacts": ["Search the contacts list.", "Find a contact by name.", "Search contacts for Bo."],

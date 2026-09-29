@@ -100,7 +100,7 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, *args: Any) -> None:  # keep the console clean
         pass
 
-    def _send(self, code: int, body: Dict[str, Any]) -> None:
+    def _send(self, code: int, body: Dict[str, Any], *, head_only: bool = False) -> None:
         data = json.dumps(body, ensure_ascii=False, default=str).encode("utf-8")
         self.send_response(code)
         # CORS: browser extensions and local web consoles call this service from
@@ -113,15 +113,19 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             return
         self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(data)))
+        # A HEAD response may omit Content-Length; emitting the length of this
+        # placeholder body would be wrong unless it matched the corresponding GET.
+        if not head_only:
+            self.send_header("Content-Length", str(len(data)))
         self.end_headers()
-        self.wfile.write(data)
+        if not head_only:
+            self.wfile.write(data)
 
     def do_HEAD(self) -> None:
         # Health checkers often probe with HEAD; answer without a body.
         path = self.path.rstrip("/")
         code = 200 if path in ("/healthz", "/", "/v1/models") else 404
-        self._send(code, {})
+        self._send(code, {}, head_only=True)
 
     def do_GET(self) -> None:
         path = self.path.rstrip("/")

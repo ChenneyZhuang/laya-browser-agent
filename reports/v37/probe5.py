@@ -87,23 +87,23 @@ def run(ckpt, items):
             "RICHT": (train_ins, dict(TRAIN_CRIT_8), x.get("state_rich", x["state"])),
         }
 
-        def resolve_target(state, op):
+        def resolve_target(state, op, item=x):
             if op not in ("CLICK", "TYPE_TEXT", "SELECT"):
                 return None
             qid = f"{op.lower()}_target"
-            if qid not in x["questions"]:
+            if qid not in item["questions"]:
                 return None
-            tq = x["questions"][qid]
+            tq = item["questions"][qid]
             try:
                 tpick = answer(model, tok, cfg, state, json.dumps(tq["instructions"], ensure_ascii=False), tq["criteria"])
             except Exception:
                 return None
-            return x["index_labels"].get(str(tpick))
+            return item["index_labels"].get(str(tpick))
 
         for arm, (ins, crit, state) in arms.items():
             try:
                 op = answer(model, tok, cfg, state, ins, crit)
-            except Exception as e:
+            except Exception:
                 op = None
             if x["suite"] == "pick":
                 exp = x.get("expected_op_semantic", "CLICK")

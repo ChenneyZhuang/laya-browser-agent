@@ -20,12 +20,12 @@
 
 ## インストール
 
-> **インストール注記**：PyPI 版はリポジトリに追いつきつつあります。今は `git clone https://github.com/ChenneyZhuang/laya-browser-agent && cd laya-browser-agent && pip install -e '.[all]'`（Apple Silicon）または `.[torch]`（その他）を推奨。
+> **インストール注記**：PyPI パッケージはまだ公開されていません。まずリポジトリをクローンし、プロジェクトルートからインストールしてください：`git clone https://github.com/ChenneyZhuang/laya-browser-agent && cd laya-browser-agent`。
 
 ```bash
-pip install 'laya-browser-agent[mlx]'      # Apple Silicon
-pip install 'laya-browser-agent[torch]'    # Linux / Windows / Intel Mac
-localdecide doctor                  # ハードウェア診断 + スモークテスト
+pip install -e '.[mlx]'      # Apple Silicon
+pip install -e '.[torch]'    # Linux / Windows / Intel Mac
+localdecide doctor           # ハードウェア診断 + スモークテスト
 ```
 
 デフォルトの v32b チェックポイントは初回使用時に一度だけダウンロード（約 1.3 GB、
