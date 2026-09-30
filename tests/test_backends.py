@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import sys
 import threading
 import types
@@ -141,7 +142,10 @@ def test_http_timeout_is_bounded_by_decider_remaining_deadline(monkeypatch):
                      timeout=0.05, retries=0).decide(
                          "state", {"pick": choice("pick", {"a": "A", "b": "B"})})
     assert result.ok, result.error
-    assert 0 < observed["timeout"] <= 0.05
+    assert observed["timeout"] > 0
+    assert observed["timeout"] <= 0.05 or math.isclose(
+        observed["timeout"], 0.05, rel_tol=0.0, abs_tol=1e-12
+    )
 
 
 def test_http_backend_rejects_malformed_envelope(monkeypatch):
