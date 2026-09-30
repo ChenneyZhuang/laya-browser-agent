@@ -21,7 +21,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Union
 
-from .backends.base import Backend, BackendError, resolve_backend
+from .backends.base import Backend, BackendError, HTTPBackend, resolve_backend
 
 State = Union[str, Mapping[str, Any], Sequence[Any]]
 
@@ -120,14 +120,32 @@ def _check_answer(name: str, question: Mapping[str, Any], answer: Any) -> Dict[s
         cleaned["confidence"] = _finite_unit(answer.get("confidence", numbers[str(chosen)]), f"{name}.confidence")
         return cleaned
     if kind == "score":
-        _finite_unit(0.0, name)  # touch: keeps the numeric contract uniform
+        criteria = question.get("criteria")
+        if not isinstance(criteria, (list, tuple)) or not criteria:
+            raise DecisionError("malformed", f"{name}: score criteria are not an ordered list")
         value = answer.get("score")
         if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)):
             raise DecisionError("malformed", f"{name}: score is not finite")
-        return dict(answer)
+        if not 0.0 <= float(value) <= len(criteria) - 1:
+            raise DecisionError("malformed", f"{name}: score is outside the offered levels")
+        probabilities = answer.get("probabilities")
+        expected = {str(index) for index in range(len(criteria))}
+        if not isinstance(probabilities, dict) or set(probabilities) != expected:
+            raise DecisionError("malformed", f"{name}: score probabilities do not cover the levels")
+        numbers = {key: _finite_unit(probabilities[key], f"{name}.{key}") for key in probabilities}
+        if abs(sum(numbers.values()) - 1.0) > 0.02:
+            raise DecisionError("malformed", f"{name}: score probabilities do not sum to one")
+        cleaned = dict(answer)
+        cleaned["score"] = float(value)
+        cleaned["probabilities"] = numbers
+        if "confidence" in answer:
+            cleaned["confidence"] = _finite_unit(answer["confidence"], f"{name}.confidence")
+        return cleaned
     if kind == "noul":
         cleaned = dict(answer)
         cleaned["noul"] = _finite_unit(answer.get("noul"), f"{name}.noul")
+        if "confidence" in answer:
+            cleaned["confidence"] = _finite_unit(answer["confidence"], f"{name}.confidence")
         return cleaned
     raise DecisionError("malformed", f"{name}: unknown question type {kind!r}")
 
@@ -184,12 +202,18 @@ class Decider:
     # -- public ---------------------------------------------------------------
 
     def decide(self, state: State, questions: Mapping[str, Question]) -> Decision:
-        """Answer every question in one shot. Never raises unless fail_open=False."""
+        """Answer every question in one shot. Never raises unless fail_open=False.
+
+        `timeout` is an overall deadline across retries and coarse-to-fine passes. A
+        synchronous duck-typed backend cannot be interrupted from Python; if it returns
+        after the deadline its result is rejected and no retry or later pass is started.
+        """
         if not questions:
             raise ValueError("no questions")
         started = time.monotonic()
         try:
-            payload = self._answer_with_retries(state, questions)
+            deadline = started + max(0.0, float(self.timeout)) if self.timeout is not None else None
+            payload = self._answer_with_retries(state, questions, deadline)
         except BackendError as error:
             return self._fail(error.code, str(error), started)
         except DecisionError as error:
@@ -208,16 +232,39 @@ class Decider:
 
     # -- internals ------------------------------------------------------------
 
-    def _answer_with_retries(self, state: State, questions: Mapping[str, Question]) -> Dict[str, Any]:
+    def _remaining(self, deadline: Optional[float]) -> Optional[float]:
+        if deadline is None:
+            return None
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise BackendError("timeout", "decision deadline exceeded")
+        return remaining
+
+    def _backend_answer(self, state: State, questions: Mapping[str, Question],
+                        remaining: Optional[float]) -> Dict[str, Any]:
+        if isinstance(self.backend, HTTPBackend) and remaining is not None:
+            return self.backend.answer(state, questions, timeout=min(self.backend.timeout, remaining))
+        return self.backend.answer(state, questions)
+
+    def _answer_with_retries(self, state: State, questions: Mapping[str, Question],
+                             deadline: Optional[float]) -> Dict[str, Any]:
         last: Optional[BackendError] = None
         prepared, plan = self._apply_coarse_to_fine(questions)
         for attempt in range(self.retries + 1):
+            remaining = self._remaining(deadline)
             try:
-                payload = self.backend.answer(state, prepared)
+                payload = self._backend_answer(state, prepared, remaining)
+                if deadline is not None and time.monotonic() > deadline:
+                    raise BackendError("timeout", "backend result arrived after decision deadline")
             except BackendError as error:
                 last = error
-                if attempt < self.retries:
-                    time.sleep(min(0.25 * (attempt + 1), 2.0))
+                if attempt < self.retries and error.code != "timeout":
+                    pause = min(0.25 * (attempt + 1), 2.0)
+                    if remaining is not None:
+                        pause = min(pause, max(0.0, remaining))
+                    if pause <= 0:
+                        raise BackendError("timeout", "decision deadline exceeded")
+                    time.sleep(pause)
                     continue
                 raise
             try:
@@ -225,11 +272,15 @@ class Decider:
                              for name, question in prepared.items()}
             except DecisionError:
                 if attempt < self.retries:
-                    time.sleep(0.2)
+                    remaining = self._remaining(deadline)
+                    pause = min(0.2, remaining) if remaining is not None else 0.2
+                    if pause <= 0:
+                        raise BackendError("timeout", "decision deadline exceeded")
+                    time.sleep(pause)
                     continue
                 raise
             if plan:
-                validated = self._finish_coarse_to_fine(state, validated, plan)
+                validated = self._finish_coarse_to_fine(state, validated, plan, deadline)
             return {
                 "answers": validated,
                 "usage": payload.get("usage", {}),
@@ -248,6 +299,7 @@ class Decider:
         """
         prepared: Dict[str, Dict[str, Any]] = {}
         plan: Dict[str, Any] = {}
+        used_names = set(questions)
         limit = max(2, int(self.max_options_per_question))
         for name, question in questions.items():
             if question.get("type") != "choice":
@@ -259,15 +311,24 @@ class Decider:
                 prepared[name] = dict(question)
                 continue
             chunks = [keys[i::(-(-len(keys) // limit))] for i in range(-(-len(keys) // limit))]
-            plan[name] = (dict(question), keys, chunks)
+            chunk_names: List[str] = []
             for index, chunk in enumerate(chunks):
+                generated = f"{name}__chunk{index}"
+                suffix = 1
+                while generated in used_names:
+                    generated = f"{name}__chunk{index}_{suffix}"
+                    suffix += 1
+                used_names.add(generated)
+                chunk_names.append(generated)
                 sub = dict(question)
                 sub["criteria"] = ({k: criteria[k] for k in chunk}
                                    if isinstance(criteria, Mapping) else list(criteria[i] for i in chunk))  # type: ignore[index]
-                prepared[f"{name}__chunk{index}"] = sub
+                prepared[generated] = sub
+            plan[name] = (dict(question), keys, chunks, chunk_names)
         return prepared, plan
 
-    def _finish_coarse_to_fine(self, state: State, answers: Dict[str, Any], plan: Dict[str, Any]) -> Dict[str, Any]:
+    def _finish_coarse_to_fine(self, state: State, answers: Dict[str, Any], plan: Dict[str, Any],
+                               deadline: Optional[float] = None) -> Dict[str, Any]:
         """Second pass: the chunk winners compete, then probabilities are recombined.
 
         p(option) = p_final(its chunk winner) * p_chunk(option), renormalised. This keeps
@@ -276,16 +337,19 @@ class Decider:
         """
         finals: Dict[str, Dict[str, Any]] = {}
         chunk_answers: Dict[str, List[Dict[str, Any]]] = {}
-        for name, (question, keys, chunks) in plan.items():
-            winners = [answers.pop(f"{name}__chunk{index}") for index in range(len(chunks))]
+        for name, (question, keys, chunks, chunk_names) in plan.items():
+            self._remaining(deadline)
+            winners = [answers.pop(chunk_name) for chunk_name in chunk_names]
             chunk_answers[name] = winners
             criteria = {(w["choice"] if not isinstance(question["criteria"], Mapping)
                          else w["choice"]): (question["criteria"].get(w["choice"], "")
                                              if isinstance(question["criteria"], Mapping) else "") for w in winners}
             finals[name] = {**question, "criteria": criteria}
-        second = self.backend.answer(state, finals)
+        second = self._backend_answer(state, finals, self._remaining(deadline))
+        if deadline is not None and time.monotonic() > deadline:
+            raise BackendError("timeout", "coarse-to-fine result arrived after decision deadline")
         second_answers = second.get("answers", {})
-        for name, (question, keys, chunks) in plan.items():
+        for name, (question, keys, chunks, chunk_names) in plan.items():
             final = _check_answer(name, finals[name], second_answers.get(name))
             probabilities: Dict[Any, float] = {}
             for winner, chunk in zip(chunk_answers[name], chunks):

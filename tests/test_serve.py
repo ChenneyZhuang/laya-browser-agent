@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import http.client
 import json
+import socket
 import threading
 import unittest
 import urllib.error
@@ -45,6 +46,14 @@ class _StaticBackend:
             options = [str(k) for k in spec.get("criteria", {})]
             if spec.get("type") == "noul" or not options:
                 answers[name] = {"type": "noul", "noul": 0.5, "confidence": 0.5}
+                continue
+            if spec.get("type") == "score":
+                probabilities = {str(index): (self.confidence if index == 0 else
+                                               round((1.0 - self.confidence) / max(len(options) - 1, 1), 6))
+                                 for index in range(len(options))}
+                probabilities["0"] = 1.0 - sum(value for key, value in probabilities.items() if key != "0")
+                answers[name] = {"type": "score", "score": 0.0,
+                                 "probabilities": probabilities, "confidence": probabilities["0"]}
                 continue
             key = options[0]
             probabilities = {option: (self.confidence if option == key else
@@ -166,11 +175,20 @@ class TestHTTPService(unittest.TestCase):
         self.assertIn("questions", body["error"])
 
     def test_systemone_roundtrip(self):
-        questions = {"q": {"type": "choice", "criteria": {"a": "Alpha", "b": "Beta"}}}
+        questions = {
+            "q": {"type": "choice", "criteria": {"a": "Alpha", "b": "Beta"}},
+            "rating": {"type": "score", "criteria": ["low", "mid", "high"]},
+            "valid": {"type": "noul", "instructions": "Is it valid?"},
+        }
         status, _, body = _request(self.httpd, "/v1/systemone", method="POST",
                                    body={"state": "pick", "questions": questions, "model": "test-model"})
         self.assertEqual(status, 200)
         self.assertEqual(body["answers"]["q"]["choice"], "a")
+        self.assertEqual(body["answers"]["rating"]["type"], "score")
+        self.assertEqual(body["answers"]["rating"]["score"], 0.0)
+        self.assertEqual(set(body["answers"]["rating"]["probabilities"]), {"0", "1", "2"})
+        self.assertEqual(body["answers"]["valid"]["type"], "noul")
+        self.assertEqual(body["answers"]["valid"]["noul"], 0.5)
         self.assertEqual(body["model"], "test-model")
         self.assertIn("latency_ms", body)
 
@@ -199,6 +217,23 @@ class TestHTTPService(unittest.TestCase):
         self.assertEqual(body["error"], "bad body length")
         self.assertEqual(response.getheader("Access-Control-Allow-Origin"), "*")
         connection.close()
+
+    def test_oversized_body_closes_keepalive_connection_safely(self):
+        with socket.create_connection(("127.0.0.1", self.httpd.server_address[1]), timeout=10) as raw:
+            raw.sendall((
+                "POST /v1/decide HTTP/1.1\r\n"
+                "Host: 127.0.0.1\r\n"
+                "Content-Type: application/json\r\n"
+                "Connection: keep-alive\r\n"
+                f"Content-Length: {MAX_BODY_BYTES + 1}\r\n"
+                "\r\n"
+            ).encode("ascii"))
+            response = http.client.HTTPResponse(raw)
+            response.begin()
+            self.assertEqual(response.status, 413)
+            response.read()
+            self.assertEqual(response.getheader("Connection"), "close")
+            self.assertEqual(raw.recv(1), b"")
 
     def test_invalid_json_400(self):
         url = f"http://127.0.0.1:{self.httpd.server_address[1]}/v1/decide"

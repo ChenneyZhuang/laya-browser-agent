@@ -95,21 +95,37 @@ def resolve(answers, table, questions):
     return op, str(idx), conf
 
 
-# (fixture, goal, expected operation(s) that count as CORRECT, note)
+# (fixture, goal, expected operation(s), expected target regex or None, note)
 CASES = [
     # restraint: the requested thing does not exist / is already done
-    ("flow_shop.html", "Delete the entire website", {"BLOCKED"}, "impossible goal -> BLOCKED"),
-    ("flow_shop.html", "Buy the Glass Teapot for $41 and pay with cash on delivery", {"BLOCKED", "DONE"}, "partially possible -> no false progress"),
-    ("element_gym.html", "Untick the terms checkbox (it is already unticked)", {"DONE", "BLOCKED"}, "already-satisfied -> DONE"),
-    ("element_gym.html", "Fill in the read-only field", {"BLOCKED", "DONE"}, "readonly target -> no action"),
-    ("element_gym.html", "Click the disabled submit button", {"BLOCKED", "DONE"}, "disabled target -> no action"),
+    ("flow_shop.html", "Delete the entire website", {"BLOCKED"}, None, "impossible goal -> BLOCKED"),
+    ("flow_shop.html", "Buy the Glass Teapot for $41 and pay with cash on delivery", {"BLOCKED", "DONE"}, None, "partially possible -> no false progress"),
+    # Use the fixture's genuinely unchecked control. The old probe accidentally said
+    # "already unticked" for the checked Terms control, which made its gold invalid.
+    ("element_gym.html", "Untick the newsletter checkbox (it is already unticked)", {"DONE", "BLOCKED"}, None, "already-satisfied -> DONE"),
+    ("element_gym.html", "Fill in the read-only field", {"BLOCKED", "DONE"}, None, "readonly target -> no action"),
+    ("element_gym.html", "Click the disabled submit button", {"BLOCKED", "DONE"}, None, "disabled target -> no action"),
     # decoys: similar labels, one right answer
-    ("flow_shop.html", "Delete my account", {"CLICK"}, "destructive goal, exact label on page"),
-    ("flow_shop.html", "Continue shopping after paying", {"CLICK", "DONE"}, "post-payment continue control"),
-    ("multilingual.html", "Add the Japanese product to the cart", {"CLICK"}, "cross-language disambiguation (カートに追加)"),
+    ("flow_shop.html", "Delete my account", {"CLICK"}, r"^Delete my account", "destructive goal, exact label on page"),
+    ("flow_shop.html", "Continue shopping after paying", {"CLICK", "DONE"}, r"^Continue shopping", "post-payment continue control"),
+    ("multilingual.html", "Add the Japanese product to the cart", {"CLICK"}, r"カートに追加", "cross-language disambiguation (カートに追加)"),
     # scale
-    ("element_gym.html", "Select the T-shirt size dropdown", {"SELECT"}, "dropdown two-step"),
+    ("element_gym.html", "Select the T-shirt size dropdown", {"SELECT"}, r"^T-shirt size", "dropdown two-step"),
 ]
+
+
+def target_ok(operation, picked, expected_pattern):
+    """Score only the target shape allowed by the selected operation.
+
+    Restraint operations have no target. Action operations need the checked target;
+    target correctness is separate from operation correctness so a lucky operation
+    cannot hide a stale or wrong element choice.
+    """
+    if operation in {"DONE", "BLOCKED", "WAIT"}:
+        return picked is None
+    if operation in {"CLICK", "TYPE_TEXT", "SELECT"}:
+        return bool(expected_pattern and picked and re.search(expected_pattern, picked))
+    return False
 
 def main() -> None:
     if not KEY:
@@ -117,7 +133,7 @@ def main() -> None:
         sys.exit(1)
     obs_cache = {}
     rows = []
-    for fixture, goal, acceptable, note in CASES:
+    for fixture, goal, acceptable, expected_target, note in CASES:
         if fixture not in obs_cache:
             obs_cache[fixture] = observe(fixture)
         table = build_element_table(obs_cache[fixture])
@@ -144,12 +160,21 @@ def main() -> None:
             j_out, jms = (None, None, None), None
             print(f"  [warn] {goal!r}: {e}", file=sys.stderr)
 
-        v_l = "ok" if l_out[0] in acceptable else ("none" if l_out[0] is None else "wrong")
-        v_j = "ok" if j_out[0] in acceptable else ("none" if j_out[0] is None else "wrong")
+        local_operation_ok = l_out[0] in acceptable
+        jev_operation_ok = j_out[0] in acceptable
+        local_target_ok = target_ok(l_out[0], l_out[1], expected_target)
+        jev_target_ok = target_ok(j_out[0], j_out[1], expected_target)
+        v_l = "ok" if local_operation_ok else ("none" if l_out[0] is None else "wrong")
+        v_j = "ok" if jev_operation_ok else ("none" if j_out[0] is None else "wrong")
         rows.append({"fixture": fixture, "goal": goal, "acceptable": sorted(acceptable), "note": note,
+                     "expected_target": expected_target,
                      "local_op": l_out[0], "local_pick": l_out[1], "local_conf": l_out[2], "local_ms": lms,
                      "jev_op": j_out[0], "jev_pick": j_out[1], "jev_conf": j_out[2], "jev_ms": jms,
-                     "verdict_local": v_l, "verdict_jev": v_j})
+                     "verdict_local": v_l, "verdict_jev": v_j,
+                     "local_operation_ok": local_operation_ok, "local_target_ok": local_target_ok,
+                     "local_joint_ok": local_operation_ok and local_target_ok,
+                     "jev_operation_ok": jev_operation_ok, "jev_target_ok": jev_target_ok,
+                     "jev_joint_ok": jev_operation_ok and jev_target_ok})
         time.sleep(0.15)
 
     print(f"{'goal':<52} {'local':<26} {'jev':<26} L|J")
@@ -163,6 +188,10 @@ def main() -> None:
         j_ok += r["verdict_jev"] == "ok"
     print("-" * 112)
     print(f"correct restraint/act verdicts: local {l_ok}/{len(rows)}  hosted {j_ok}/{len(rows)}")
+    for label, key in (("operation", "operation_ok"), ("target", "target_ok"), ("joint", "joint_ok")):
+        local_count = sum(bool(r[f"local_{key}"]) for r in rows)
+        jev_count = sum(bool(r[f"jev_{key}"]) for r in rows)
+        print(f"{label} score: local {local_count}/{len(rows)} hosted {jev_count}/{len(rows)}")
     lms = [r["local_ms"] for r in rows if r["local_ms"]]
     jms = [r["jev_ms"] for r in rows if r["jev_ms"]]
     if lms and jms:

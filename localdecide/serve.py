@@ -110,9 +110,13 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
         if code == 204:  # no content: no body, no Content-Type/Length
+            if self.close_connection:
+                self.send_header("Connection", "close")
             self.end_headers()
             return
         self.send_header("Content-Type", "application/json; charset=utf-8")
+        if self.close_connection:
+            self.send_header("Connection", "close")
         # A HEAD response may omit Content-Length; emitting the length of this
         # placeholder body would be wrong unless it matched the corresponding GET.
         if not head_only:
@@ -154,6 +158,10 @@ class Handler(BaseHTTPRequestHandler):
         try:
             length = int(self.headers.get("Content-Length", 0) or 0)
             if length <= 0 or length > MAX_BODY_BYTES:
+                # Do not leave an oversized unread body on a persistent socket: the next
+                # request would parse those bytes as an HTTP request line. Closing is the
+                # only safe response because draining an attacker-sized body is unbounded.
+                self.close_connection = True
                 self._send(413, {"error": "bad body length"})
                 return
             payload = json.loads(self.rfile.read(length) or b"{}")

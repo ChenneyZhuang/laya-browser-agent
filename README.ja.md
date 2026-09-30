@@ -4,19 +4,22 @@
 
 > これは laya-browser-agent の日本語ドキュメントです。最新情報は [README.md](README.md) をご覧ください。
 
-**Laya 駆動のブラウザエージェント決定エンジン — オープンソースの System 1 モデル。TypeSafe Jev のローカル代替：クラウド不要、API キー不要、スクリーンショット不要。**
+**Jev 系モデル向けのマルチバックエンド制約付き意思決定支援。** Laya の MLX/PyTorch、
+`answer(state, questions)` を持つ同期 duck backend、任意の System One 形式 HTTP endpoint
+を利用できます。ブラウザの既定値は自作 checkpoint の推奨であり、専有モデルの強制ではありません。
 
 [![tests](https://github.com/ChenneyZhuang/laya-browser-agent/actions/workflows/tests.yml/badge.svg)](https://github.com/ChenneyZhuang/laya-browser-agent/actions/workflows/tests.yml/badge.svg)
 [![HuggingFace](https://img.shields.io/badge/%F0%9F%A4%97-ichenney%2Flaya--browser--v32b-yellow)](https://huggingface.co/ichenney/laya-browser-v32b)
 
 決定モデルは状態について型付きの質問に答え、生成テキストではなく**較正された確率**を返します。テキストを生成しないため、指示を幻覚することはありません。ページ上の操作可能な要素の番号付きリストを渡すと、次に実行すべき操作と対象要素を教えてくれます。これがブラウザエージェントの「決定」部分に最適な形です。
 
-> **🚀 独自チェックポイントがデフォルトに：8ベンチマーク中6つで公式を上回る。**
-> `model="browser"` は現在 **[ichenney/laya-browser-v32b](https://huggingface.co/ichenney/laya-browser-v32b)**
-> を読み込みます — holdout **0.7125 vs 公式 0.425**、MiniWoB **0.9138 vs 0.6638**、
-> JevBench hard **0.4144 vs 0.243**。3080 GPU で **27 ms/決定**（Jev API の 31 倍速）。
-> コード変更ゼロ、HF Hub から一度だけダウンロード、以後完全オフライン。
-> 公式チェックポイントを使う場合：`model="browser-legacy"`
+`model="browser"` は **[ichenney/laya-browser-v32b](https://huggingface.co/ichenney/laya-browser-v32b)**
+の `v32b` サブフォルダを推奨します。`model="browser-legacy"` は upstream
+`cklxx/laya-browser` の `v10s` パスです。upstream の `main` からこの旧ディレクトリが削除されたため、
+legacy 別名はデフォルトで revision `adf912be85ff9221ee171551778456b133c1af75` に固定されます（`revision=` で上書き可能）。
+コミット済みの歴史的診断は 9 指標で 5 勝 4 敗、
+8 指標の正確性ビューでは 5 勝 3 敗です。新しい推論結果ではありません。公開 checkpoint には
+95-case deployment の反証があり、v37 は runtime acceptance 未通過で、利用可能とは主張しません。
 
 ## インストール
 
@@ -30,6 +33,42 @@ localdecide doctor           # ハードウェア診断 + スモークテスト
 
 デフォルトの v32b チェックポイントは初回使用時に一度だけダウンロード（約 1.3 GB、
 公式 v10s に戻す `browser-legacy` は約 650 MB）。以後は完全オフラインで動作。
+
+`model`、`subfolder`、`revision` は検証済み upstream runtime へ渡されます。HTTP backend は
+`model`、`api_key`、`timeout` を受け付け、カスタム backend は同期 `answer(state, questions)`
+を実装します。`Decider` の総 timeout は残りの HTTP timeout を制限します。同期 duck 呼び出しは
+Python から強制キャンセルできないため、遅れて返った結果は拒否し、後続呼び出しは行いません。
+
+### backend 設定、timeout、安全境界
+
+実際の v32b モデル名、API key、HTTP timeout、カスタム backend の例です。
+
+```python
+from localdecide import Decider
+from localdecide.backends.base import HTTPBackend, LayaTorchBackend
+
+local = LayaTorchBackend(model="ichenney/laya-browser-v32b", subfolder="v32b")
+
+class MyBackend:
+    name = "my-local-backend"
+    def answer(self, state, questions):
+        return {"answers": {}, "usage": {}}
+
+remote = HTTPBackend(
+    "http://127.0.0.1:8791/v1/systemone",
+    model="browser", api_key="example-key", timeout=10.0,
+)
+decider = Decider(backend=remote, timeout=12.0, retries=1)
+```
+
+ローカルの MLX/PyTorch backend はページ状態を端末外へ送りません。HTTP backend は
+設定した endpoint に状態と質問を送るため、信頼できるローカルまたはプライベートな
+サービスだけを使ってください。`api_key` は Bearer header になるので、実際の key は
+ソースや shell history ではなく `LOCALDECIDE_API_KEY` または secret manager に置きます。
+パスワード値は観測から削除され、vault アクセスを提供しないため `TYPE_TEXT` は password
+欄を拒否します。送信・削除・支払いなど不可逆な操作には人間の `confirm` callback を
+指定してください。同期カスタム backend は Python から強制中断できず、timeout 後の
+結果は拒否され、再呼び出しも行われません。
 
 ## 測定値（M4, 16 GB）
 
@@ -58,13 +97,13 @@ localdecide doctor           # ハードウェア診断 + スモークテスト
 | JevBench easy | 0.8542 | 0.979 | 1.0000 |
 | レイテンシ（p50） | **27 ms**（RTX 3080） | — | 854 ms（ネットワーク） |
 
-ローカル（無料・オフライン）枠では 8 項目中 6 項目で公式を上回る。Jev クラウド API には絶対精度で及ばないが、**無料・プライバシー（ページ内容は端末外に出ない）・オフライン・31 倍速**で、`score` 問題（0.667 vs 0.333）と `temporal_numeric`（0.33 vs 0.20）では Jev を逆転。詳細は [英語版 Benchmarks](README.md#benchmarks) と [JEV_COMPARISON.md](reports/v20/JEV_COMPARISON.md)。
+この表に対応するコミット済み診断の歴史的集計は 9 指標で 5 勝 4 敗、8 指標の正確性ビューで 5 勝 3 敗です。Jev クラウド API には絶対精度で及ばないが、**無料・プライバシー・オフライン**という別の価値があります。詳細は [英語版 Benchmarks](README.md#benchmarks) と [JEV_COMPARISON.md](reports/v20/JEV_COMPARISON.md)。
 
 全 15 バージョン・すべての失敗パス・トレーニングスクリプトは姉妹リポジトリ [laya-training-log](https://github.com/ChenneyZhuang/laya-training-log) に公開。
 
 ### 公式 Jev との対決：実測データ
 
-以下の対戦は v32b 登場前の実施で、ローカル側は当時の公式 v10s チェックポイント（歴史的記録として保持。v32b は 8 ベンチマーク中 6 つで v10s を上回る、上表参照）。`examples/diagnostics/jev_head_to_head.py`（単発）と `jev_flow_h2h.py`（マルチステップ）で、同じタスクをローカル Laya v10s と公式 jev-1.13.0 に実行して比較：
+以下の対戦は v32b 登場前の実施で、ローカル側は当時の公式 v10s チェックポイントです。歴史的記録であり、新モデル推論ではありません。`examples/diagnostics/jev_head_to_head.py`（単発）と `jev_flow_h2h.py`（マルチステップ）で比較します：
 
 | 単発・ゼロ文脈（12 問 / 6 言語） | ローカル v10s | 公式 Jev |
 |---|---|---|
@@ -87,16 +126,15 @@ localdecide doctor           # ハードウェア診断 + スモークテスト
 
 | タスク | ローカル v10s | 公式 Jev |
 |---|---|---|
-| プールリード判定 `relevant` | 3/7 正解 | **7/7** |
+| プールリード `relevant`（10例） | **6/10** | **10/10** |
 | リード質スコア（0-4）| 低め（1.0-2.0）| **良好（2.4-3.7）** |
-| 中国語SMS：取引識別/種別 | **6/8** | 6/8 |
-| 中国語SMS：**フィッシング検知** | **0/3** | **3/3** |
+| 中国語SMS：取引/種別/フィッシング joint（8例） | **5/8** | **5/8** |
 | 堅牢性（空/5k文字/敵対表現）| 3/3 | 3/3 |
 | 中央値レイテンシ | **36ms** | 738ms |
 
 フィッシング検知は要注意：「お母さん、携帯が壊れて…5000元送って」型の詐欺をローカルは p=0.14、赤い袋詐欺は p=0.23 と両方通過させてしまう。公式 Jev は両方 p=0.96。**詐欺・悪用など安全に関わるルーティングにローカル単体は現状不適。**
 
-**ブラウザエッジケース**（`jev_edge_h2h.py`、9例、正解が「動かない」場合）：ローカル 4/9、公式 5/9、失敗の方向は正反対。ローカルは先に撃つ型：サイト全削除を頼まれると「Delete my account」を p=0.93 でクリック。公式は不可能目標をブロックするが正常な目標まで誤ブロック。両エンジンとも「この目標は達成不可能」の概念が未成熟で、今のセーフティはハーネスのガードが担う。
+**ブラウザエッジケース**（`jev_edge_h2h.py`、9例）：旧 4/9 対 5/9 は operation のみの集計です。現在の scorer は operation・target・joint を分けて出力し、gold は実際に未チェックの newsletter control に修正しました。旧 checked-fixture 行を新モデル結果として扱いません。
 
 4バッテリーの実用結論：精度・安全キャリブレーション重視→公式 Jev。レイテンシ（10-20倍速い）・プライバシー・無料大量→ローカル＋ガード補償。中国語 grounding・フィッシング・抑制が微調整で狙うべき方向。
 ## 主な特徴
@@ -111,7 +149,7 @@ localdecide doctor           # ハードウェア診断 + スモークテスト
 
 ### 文献・根拠
 
-- [arXiv 2609.23959](https://arxiv.org/abs/2609.23959)（2026-09）：独立の検証——同型の「typed decision」読み出しを詐欺スクリーニングに適用し、データが揃えば AUROC .974・較正誤差 .052・64.5ms/判断（コンシューマ GPU）。本READMEのテキストバッテリーで見えたフィッシング弱点は訓練データの問題であり、アーキテクチャの限界ではない。
+- [arXiv 2609.23959](https://arxiv.org/abs/2609.23959)（2026-09）：関連する typed-decision 詐欺スクリーニング課題は AUROC .974、較正誤差 .052 を報告しています。これは背景情報であり、本プロジェクトの SMS 結果の因果説明ではありません。
 - Laya 上流の公開較正ベンチマーク：13タスク族で **accuracy 0.753 @ ECE 0.030**（温度スケーリング後）。v10s ブラウザcheckpointはブラウザ分布外のテキストでこの較正水準を継承していない（上記プール/SMSの結果を参照）。
 
 ## ライセンス

@@ -8,11 +8,13 @@ rather than anyone's checkpoint quality.
 from __future__ import annotations
 
 import unittest
+import time
 from typing import Any, Dict
 
 from localdecide import BrowserDecider, Decider, Scope, choice, goal_tokens, noul, score
 from localdecide.decider import DecisionError
-from localdecide.page import build_element_table, table_to_questions
+from localdecide.drivers import _BaseDriver
+from localdecide.page import Element, build_element_table, table_to_questions
 
 
 class TestScope(unittest.TestCase):
@@ -258,6 +260,30 @@ class TestElementTable(unittest.TestCase):
         self.assertNotIn("elements", table.state(layout="v3"))
         self.assertIn("elements", table.state(layout="v1"))
 
+    def test_password_values_are_redacted_at_observation_and_table_boundaries(self):
+        raw = {"actions": [{"kind": "fill", "node": "pw", "role": "password",
+                             "label": "secret", "current_value": "secret"}]}
+        observed = _BaseDriver()._observe_common("https://example.test", "T", "", raw["actions"])
+        self.assertEqual(observed["actions"][0]["label"], "Password field")
+        self.assertNotIn("secret", repr(observed))
+
+        table = build_element_table(raw)
+        element = table.elements[0]
+        self.assertTrue(element.sensitive)
+        self.assertNotIn("secret", element.describe())
+        self.assertNotIn("secret", repr(table.to_dict()))
+
+        restored = type(table).from_dict({"elements": [{"index": "1", "role": "password",
+                                                          "label": "secret", "value": "secret"}]})
+        self.assertTrue(restored.elements[0].sensitive)
+        self.assertNotIn("secret", repr(restored.to_dict()))
+
+    def test_manually_constructed_sensitive_element_cannot_leak_value(self):
+        element = Element(index="1", label="Password", role="password",
+                          value="secret", sensitive=True)
+        self.assertNotIn("secret", element.describe())
+        self.assertNotIn("secret", repr(element.to_dict()))
+
     def test_dropdown_options_are_scoped_to_their_fields(self):
         actions = self.observation["actions"]
         actions.append({"kind": "select", "node": "n4", "label": "Language",
@@ -287,6 +313,15 @@ class TestElementTable(unittest.TestCase):
             driver, "Set language to Japanese")
         self.assertEqual(driver.executed, [("SELECT", "2", "ja")])
         self.assertEqual(run.stopped, "max_steps")
+
+    def test_scope_accepts_accessibility_elements_and_canonicalizes_actions(self):
+        observation = {"url": "https://example.test", "elements": [
+            {"id": "save", "label": "Save", "role": "button", "clickable": True},
+            {"id": "query", "label": "Query", "role": "textbox", "editable": True},
+        ]}
+        scoped = Scope(drop_chrome=False).apply(observation, goal="Click Save")
+        self.assertEqual([item["label"] for item in scoped["actions"]], ["Save", "Query"])
+        self.assertEqual([item["index"] for item in scoped["actions"]], [1, 2])
 
 
 class FakeDriver:
@@ -393,7 +428,20 @@ class TestLoop(unittest.TestCase):
         ]}])
         run = BrowserDecider(decider=Decider(backend=backend)).run(driver, "type something")
         self.assertEqual(run.stopped, "error")
-        self.assertIn("text provider", run.error)
+
+    def test_password_type_text_is_rejected_without_vault_access(self):
+        observation = {"url": "https://x", "title": "Login", "text": "", "actions": [
+            {"kind": "fill", "node": "pw", "label": "Password", "role": "password",
+             "current_value": "secret"},
+        ]}
+        backend = _SequenceBackend([{"operation": "TYPE_TEXT", "type_text_target": "1"}])
+        driver = FakeDriver([observation])
+        run = BrowserDecider(decider=Decider(backend=backend, retries=0),
+                             text_provider=lambda goal, element: "new-secret", max_steps=1).run(
+            driver, "Enter the password")
+        self.assertEqual(driver.executed, [])
+        self.assertIn("vault access is not provided by this project", run.error)
+        self.assertIn("password", run.steps[-1].detail)
 
     def test_type_text_uses_the_provider(self):
         backend = _SequenceBackend([{"operation": "TYPE_TEXT", "type_text_target": "1"}])
@@ -497,6 +545,80 @@ class TestCoarseToFine(unittest.TestCase):
         self.assertIn("pick__chunk0", first_pass)
         self.assertLessEqual(len(first_pass["pick__chunk0"]["criteria"]), 20)
         self.assertGreaterEqual(len(backend.calls), 2)  # a second pass for the winners
+
+    def test_generated_coarse_to_fine_names_do_not_overwrite_questions(self):
+        options = {str(i): f"option {i}" for i in range(1, 7)}
+
+        class Capture(FakeBackend):
+            def answer(self, state, questions):
+                self.calls.append((state, dict(questions)))
+                answers = {}
+                for name, question in questions.items():
+                    keys = list(question["criteria"])
+                    answers[name] = one_choice(keys[0], keys)
+                return {"answers": answers, "usage": {}, "latency_ms": 1, "backend": self.name}
+
+        backend = Capture()
+        questions = {"pick": choice("pick", options),
+                     "pick__chunk0": choice("already exists", {"x": "X", "y": "Y"})}
+        result = Decider(backend=backend, max_options_per_question=2, retries=0).decide("s", questions)
+        self.assertTrue(result.ok, result.error)
+        first_names = set(backend.calls[0][1])
+        self.assertEqual(len([name for name in first_names if name.startswith("pick__chunk")]), 4)
+        self.assertIn("pick__chunk0", result.answers.raw)
+
+
+class TestDeadlinesAndAnswerContracts(unittest.TestCase):
+    def test_timeout_is_overall_and_late_custom_sync_result_is_rejected(self):
+        class Slow:
+            name = "slow"
+
+            def __init__(self):
+                self.calls = 0
+
+            def answer(self, state, questions):
+                self.calls += 1
+                time.sleep(0.02)
+                return {"answers": {"q": {"type": "noul", "noul": 0.9}},
+                        "usage": {}, "latency_ms": 20, "backend": self.name}
+
+        backend = Slow()
+        result = Decider(backend=backend, timeout=0.001, retries=3).decide("s", {"q": noul("yes?")})
+        self.assertFalse(result.ok)
+        self.assertIn("timeout", result.error or "")
+        self.assertEqual(backend.calls, 1, "a late synchronous result must not trigger retries")
+
+    def test_score_and_noul_require_their_actual_answer_shapes(self):
+        class Contracts:
+            name = "contracts"
+
+            def __init__(self, malformed=False):
+                self.malformed = malformed
+
+            def answer(self, state, questions):
+                answers = {}
+                for name, question in questions.items():
+                    if question["type"] == "score":
+                        if self.malformed:
+                            answers[name] = {"type": "score", "choice": "1"}
+                        else:
+                            answers[name] = {"type": "score", "score": 1.0,
+                                             "probabilities": {"0": 0.1, "1": 0.8, "2": 0.1},
+                                             "confidence": 0.8}
+                    else:
+                        answers[name] = {"type": "noul", "noul": 0.9, "confidence": 0.9}
+                return {"answers": answers, "usage": {}, "latency_ms": 1, "backend": self.name}
+
+        questions = {"rating": score("rate", ["low", "mid", "high"]),
+                     "valid": noul("is it valid?")}
+        result = Decider(backend=Contracts(), retries=0).decide("s", questions)
+        self.assertTrue(result.ok, result.error)
+        assert result.answers is not None
+        self.assertEqual(result.answers.score("rating"), 1.0)
+        self.assertEqual(result.answers.noul("valid"), 0.9)
+
+        malformed = Decider(backend=Contracts(malformed=True), retries=0).decide("s", questions)
+        self.assertFalse(malformed.ok)
 
 
 
@@ -670,6 +792,36 @@ class TestConfidenceGate(unittest.TestCase):
         BrowserDecider(decider=Decider(backend=Middling(), retries=0), max_steps=1,
                        min_confidence=0.2).run(driver2, "do a thing")
         self.assertEqual(driver2.executed, [("CLICK", "1", None)], "a low threshold must allow it")
+
+    def test_low_confidence_select_option_is_refused_before_execution(self):
+        class UnsureOption:
+            name = "unsure-option"
+
+            def answer(self, state, questions):
+                answers = {}
+                for name, question in questions.items():
+                    keys = list(question.get("criteria", {}))
+                    if name == "operation":
+                        answers[name] = one_choice("SELECT", keys)
+                    elif name == "select_target":
+                        answers[name] = one_choice("1", keys)
+                    elif name == "select_option":
+                        answers[name] = {"type": "choice", "choice": keys[-1],
+                                         "probabilities": {keys[-1]: 0.99, keys[0]: 0.01},
+                                         "confidence": 0.01}
+                    else:
+                        answers[name] = one_choice(keys[0], keys)
+                return {"answers": answers, "usage": {}, "latency_ms": 1, "backend": self.name}
+
+        observation = {"url": "https://x", "title": "T", "text": "", "actions": [
+            {"kind": "select", "node": "country", "label": "Country",
+             "options": [{"label": "Australia", "value": "au"}, {"label": "Japan", "value": "jp"}]},
+        ]}
+        driver = FakeDriver([observation])
+        run = BrowserDecider(decider=Decider(backend=UnsureOption(), retries=0), max_steps=1).run(
+            driver, "select a country")
+        self.assertEqual(driver.executed, [])
+        self.assertIn("below", run.steps[-1].detail)
 
 
 class TestEmptySubmitGuard(unittest.TestCase):

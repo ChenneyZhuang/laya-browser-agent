@@ -61,6 +61,7 @@ class ElementRef:
     # Observed dropdown choices, each {"index": "3:1", "label": ..., "value": ...}.
     # Carried so SELECT can resolve an option without re-reading the page.
     options: List[Dict[str, str]] = field(default_factory=list)
+    sensitive: bool = False
 
 
 @dataclass
@@ -228,7 +229,7 @@ class BrowserDecider:
                         element = ElementRef(found.index, found.label, found.role, found.handle,
                                              {**found.meta, "checked": found.checked,
                                               "options": found.options},
-                                             options=list(found.options))
+                                             options=list(found.options), sensitive=found.sensitive)
                         confidence = min(confidence, answers.confidence(question_name))
                     else:
                         step = Step(number, operation, None, "", confidence, decision.latency_ms, False,
@@ -254,25 +255,6 @@ class BrowserDecider:
                     self._emit(run.steps[-1])
                     run.stopped, run.error = "error", f"unsupported operation {operation!r}"
                     return run
-
-                # Confidence gate: a decision the model is unsure about is not an action.
-                # Measured: on an ambiguous page the checkpoint proposed CLICK on a submit
-                # button with p=0.06. Executing that is worse than asking again, and worse
-                # still than letting the caller take over, so low-confidence steps are
-                # refused and recorded. DONE/BLOCKED are exempt: stopping is always safe.
-                if operation not in ("DONE", "BLOCKED") and confidence < self.min_confidence:
-                    run.steps.append(Step(number, operation, target, element.label if element else "",
-                                          confidence, decision.latency_ms, False,
-                                          detail=f"refused: confidence {confidence:.2f} below {self.min_confidence:.2f}"))
-                    self._emit(run.steps[-1])
-                    history.append({"action": operation, "kind": operation.lower(), "target": target,
-                                    "text": None, "page_changed": False})
-                    low = sum(1 for s in run.steps if "below" in s.detail)
-                    if low >= 2:
-                        run.stopped, run.error = "error", (
-                            f"model is not confident enough to act (last: {confidence:.2f})")
-                        return run
-                    continue
 
                 # Human gate: irreversible-looking actions stop here unless the caller
                 # has supplied a confirmation callback that says yes.
@@ -327,6 +309,14 @@ class BrowserDecider:
 
                 text: Optional[str] = None
                 if operation == "TYPE_TEXT":
+                    if element is not None and element.sensitive:
+                        run.steps.append(Step(number, operation, target, element.label,
+                                              confidence, decision.latency_ms, False,
+                                              detail="refused: password input is sensitive; vault access is not provided by this project"))
+                        self._emit(run.steps[-1])
+                        run.stopped, run.error = "error", (
+                            "password input rejected: vault access is not provided by this project")
+                        return run
                     if self.text_provider is None:
                         run.steps.append(Step(number, operation, target, element.label if element else "",
                                               confidence, decision.latency_ms, False, detail="no text provider"))
@@ -376,6 +366,22 @@ class BrowserDecider:
                         run.stopped, run.error = "error", "empty dropdown option"
                         return run
                     confidence = min(confidence, answers.confidence(option_question))
+
+                # Confidence gate: evaluate after all parts of a compound action are known.
+                # SELECT has both a field and an option confidence; neither may be ignored.
+                if operation not in ("DONE", "BLOCKED") and confidence < self.min_confidence:
+                    run.steps.append(Step(number, operation, target, element.label if element else "",
+                                          confidence, decision.latency_ms, False,
+                                          detail=f"refused: confidence {confidence:.2f} below {self.min_confidence:.2f}"))
+                    self._emit(run.steps[-1])
+                    history.append({"action": operation, "kind": operation.lower(), "target": target,
+                                    "text": None, "page_changed": False})
+                    low = sum(1 for s in run.steps if "below" in s.detail)
+                    if low >= 2:
+                        run.stopped, run.error = "error", (
+                            f"model is not confident enough to act (last: {confidence:.2f})")
+                        return run
+                    continue
 
                 # Loop guard: same operation on the same target twice with no page change.
                 repeats = sum(1 for item in history[-2:]

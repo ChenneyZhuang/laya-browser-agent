@@ -1,0 +1,3 @@
+include scripts/run_live_batched.sh
+recursive-include tests *.py
+recursive-include tests/fixtures *.html

@@ -6,6 +6,22 @@ Format based on [Keep a Changelog](https://keepachangelog.com/); versioning foll
 ## [Unreleased]
 
 ### Fixed
+- Password values are redacted at DOM observation, normalization, table serialization,
+  and description boundaries; password entry is rejected with an explicit vault-not-provided
+  message. Browser execution now resolves stable observation handles and rechecks identity,
+  actionability, overlays, disabled/read-only state, and current geometry in both drivers.
+- CDP target URL misses fail closed, `Runtime.evaluate` exception details propagate, and
+  Playwright constructor failures clean up the runtime and restore the caller's event loop;
+  close is idempotent.
+- The `browser-legacy` alias pins the historical `cklxx/laya-browser` `v10s` revision that
+  upstream removed from `main`; callers can still override it with `revision=`.
+- Decision deadlines now cover retries, coarse-to-fine passes, and HTTP transport timeouts;
+  late synchronous duck-backend results are rejected without pretending to cancel them.
+- Score/noul response schemas, SELECT option confidence, MCP invalid requests/notifications,
+  HTTP 413 keep-alive closure, generated question-name collisions, and wheel/sdist contents
+  now have model-free regression coverage.
+- The live batch launcher honors explicit `PYTHON`, then a repository venv, then an existing
+  interpreter, while preserving pipefail and failure propagation.
 - `HEAD` responses no longer write a JSON body onto a persistent HTTP connection; a regression test sends `HEAD` and then `GET` on the same socket.
 - The Jev wire-compatibility test now starts an ephemeral local server with a deterministic fake backend. It no longer fails with connection-refused when port 8791 is not manually running, and it is suitable for CI.
 - `run_live_batched.sh` now fails fast when a pytest batch fails. It previously used `set -u` only, so a failed pytest piped through `tail` could be reported as a successful live run; a regression test now stubs a failing batch and checks the script exits nonzero immediately.
@@ -33,9 +49,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/); versioning foll
 - 5 contract tests for the guard: refusal, two-strike stop, filled-field
   pass-through, submit-word-without-empty-field stands down, non-submit words
   never blocked.
-- Live suite: 34/34 on v32b AND 34/34 on browser-legacy (regression-free). The
-  search-flow and reveal-flow tests now accept both guard refusals (confidence gate
-  or empty-submit guard) — a safe stop either way, as the tests always intended.
+- Historical live-suite observations remain labelled as checkpoint-specific; current
+  acceptance work is model-free unless a live run is explicitly authorized and available.
 
 ### Changed
 - READMEs (en/zh/ja/es): the empty-submit failure and its guard documented in the
@@ -62,9 +77,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/); versioning foll
 - Fine-tuned checkpoint release: **v32b-b15** — frozen-encoder head
   fine-tune of `cklxx/laya-browser` published at
   [`ichenney/laya-browser-v32b`](https://huggingface.co/ichenney/laya-browser-v32b).
-  Beats the official browser-tuned checkpoint on 6/8 benchmarks
-  (recovery2-holdout 0.7125 vs 0.425; MiniWoB-116 0.9138 vs 0.6638;
-  JevBench hard 0.4144 vs 0.243; injection_safety 0.75 vs 0.50).
+  Historical final comparison: nine metrics win 5 and lose 4 against the official
+  browser-tuned reference; the eight-metric correctness view wins 5 and loses 3.
 - `reports/v20/MULTIDIM_COMPARISON.md` — the full v17→v32 recipe,
   per-family breakdowns, and the noul root-cause analysis.
 - `reports/v20/JEV_COMPARISON.md` — fresh 231-item head-to-head against
@@ -118,9 +132,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/); versioning foll
 ## [0.2.1] - 2026-09-24
 
 ### Added
-- Literature section in all four READMEs: arXiv 2609.23959 (Open-Jev on
-  CallScreenBench — AUROC .974, 64.5 ms/decision) and arXiv 2402.09769
-  (single-forward-pass lineage).
+- Literature section in all four READMEs: the related typed-decision screening result is
+  retained as context, without presenting it as a causal explanation of this project's SMS results.
 - Upstream calibration baselines in the performance table (p50 38 ms,
   ECE 0.030 across 13 task families).
 
@@ -136,8 +149,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/); versioning foll
 - SPA-aware `page_changed` DOM-signature detection in both drivers.
 
 ### Fixed
-- Every README number traced to a results file; all external links verified;
-  star counts and badges current (credibility pass).
+- README benchmark claims are explicitly labelled as selected committed diagnoses;
+  fixed star-count claims were removed from the credibility pass.
 
 ## [0.1.1] - 2026-09-22
 

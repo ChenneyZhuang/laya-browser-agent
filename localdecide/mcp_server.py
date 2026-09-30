@@ -114,36 +114,65 @@ class _Session:
 
     # -- handlers ----------------------------------------------------------
 
-    def handle(self, message: Dict[str, Any]) -> Dict[str, Any]:
-        method = message.get("method", "")
+    def handle(self, message: Any) -> Dict[str, Any]:
+        if not isinstance(message, dict):
+            return self._error(None, -32600, "invalid request: expected an object")
+        if message.get("jsonrpc") != "2.0" or not isinstance(message.get("method"), str):
+            return self._error(message.get("id"), -32600, "invalid request")
+        method = message["method"]
         request_id = message.get("id")
+        notification = "id" not in message
+
+        def reply(response: Dict[str, Any]) -> Dict[str, Any]:
+            return {} if notification else response
+
         try:
             if method == "initialize":
-                requested = str(message.get("params", {}).get("protocolVersion", "") or "")
+                params = message.get("params", {})
+                if not isinstance(params, dict):
+                    return reply(self._error(request_id, -32602, "params must be an object"))
+                requested = str(params.get("protocolVersion", "") or "")
                 # Spec: same version if we support it, else our latest.
                 version = requested if requested in SUPPORTED_PROTOCOL_VERSIONS else PROTOCOL_VERSION
-                return self._ok(request_id, {
+                return reply(self._ok(request_id, {
                     "protocolVersion": version,
                     "capabilities": {"tools": {}},
                     "serverInfo": SERVER_INFO,
-                })
+                }))
             if method == "notifications/initialized":
                 return {}  # notification: no response
             if method == "tools/list":
-                return self._ok(request_id, {"tools": TOOLS})
+                return reply(self._ok(request_id, {"tools": TOOLS}))
             if method == "tools/call":
-                return self._ok(request_id, self._call_tool(message.get("params", {})))
+                params = message.get("params", {})
+                if not isinstance(params, dict):
+                    return reply(self._error(request_id, -32602, "params must be an object"))
+                try:
+                    result = self._call_tool(params)
+                except ValueError as error:
+                    return reply(self._error(request_id, -32602, str(error)))
+                return reply(self._ok(request_id, result))
             if method == "ping":
-                return self._ok(request_id, {})
-            return self._error(request_id, -32601, f"method not found: {method}")
+                return reply(self._ok(request_id, {}))
+            return reply(self._error(request_id, -32601, f"method not found: {method}"))
         except Exception as error:
-            return self._error(request_id, -32603, f"{type(error).__name__}: {error}")
+            return reply(self._error(request_id, -32603, f"{type(error).__name__}: {error}"))
 
     def _call_tool(self, params: Dict[str, Any]) -> Dict[str, Any]:
         name = params.get("name", "")
-        arguments = params.get("arguments", {}) or {}
+        arguments = params.get("arguments", {})
+        if not isinstance(name, str) or not name:
+            return self._tool_error("tool name is required")
+        if arguments is None:
+            arguments = {}
+        if not isinstance(arguments, dict):
+            raise ValueError("arguments must be an object")
         if name == "decide":
-            decision = self.decider().decide(arguments.get("state", ""), arguments.get("questions") or {})
+            state = arguments.get("state", "")
+            questions = arguments.get("questions")
+            if not isinstance(state, (str, dict)) or not isinstance(questions, dict) or not questions:
+                return self._tool_error("decide requires state string/object and non-empty questions object")
+            decision = self.decider().decide(state, questions)
             if not decision.ok:
                 return self._tool_error(f"decision failed open: {decision.error}")
             assert decision.answers is not None
@@ -152,9 +181,9 @@ class _Session:
                  "backend": decision.answers.backend}, ensure_ascii=False, default=str)}]}
         if name == "page_decide":
             goal = str(arguments.get("goal", "") or "")
-            observation = arguments.get("observation") or {}
-            if not goal.strip():
-                return self._tool_error("goal is required")
+            observation = arguments.get("observation")
+            if not goal.strip() or not isinstance(observation, dict):
+                return self._tool_error("page_decide requires a goal and observation object")
             table = build_element_table(observation)
             questions = table_to_questions(table, goal)
             decision = self.decider().decide(table.state(text_chars=1200), questions)
@@ -190,9 +219,9 @@ class _Session:
         return {"jsonrpc": "2.0", "id": request_id, "error": {"code": code, "message": message}}
 
 
-def serve() -> None:
+def serve(session: _Session | None = None) -> None:
     """Run the MCP server over stdio until stdin closes."""
-    session = _Session()
+    session = session or _Session()
     for line in sys.stdin:
         line = line.strip()
         if not line:
@@ -200,6 +229,9 @@ def serve() -> None:
         try:
             message = json.loads(line)
         except json.JSONDecodeError:
+            response = _Session._error(None, -32700, "parse error")
+            sys.stdout.write(json.dumps(response, ensure_ascii=False) + "\n")
+            sys.stdout.flush()
             continue
         response = session.handle(message)
         if response:  # notifications produce no response

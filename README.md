@@ -1,6 +1,9 @@
 # laya-browser-agent
 
-**Browser agent decisions powered by Laya — the open-source System 1 model. A local alternative to TypeSafe Jev: no cloud, no API key, no screenshots.**
+**Multi-backend constrained decision support for Jev-like models.** This project can run
+Laya through MLX or PyTorch, accept any synchronous `answer(state, questions)` duck backend,
+or call an arbitrary System One-shaped HTTP endpoint. The recommended browser default is
+the project's own open checkpoint, not a forced proprietary model.
 
 **[English](README.md)** | [中文](README.zh-CN.md) | [日本語](README.ja.md) | [Español](README.es.md)
 
@@ -25,16 +28,19 @@ a numbered table of the controls on a page, and it tells you which operation to 
 and which element to act on.
 
 This project wires those models into that role, locally, for whatever agent you
-already use.
+already use. By default, `model="browser"` recommends the project's
+[ichenney/laya-browser-v32b](https://huggingface.co/ichenney/laya-browser-v32b)
+checkpoint in subfolder `v32b`; `model="browser-legacy"` selects the upstream
+`cklxx/laya-browser` `v10s` path. Because upstream `main` no longer carries that
+historical directory, the legacy alias pins revision
+`adf912be85ff9221ee171551778456b133c1af75` by default; pass `revision=` to override it.
+Both are explicit configuration choices.
 
-> **🚀 Fine-tuned checkpoint included:** this project also trains
-> **[ichenney/laya-browser-v32b](https://huggingface.co/ichenney/laya-browser-v32b)**,
-> which **beats the official browser-tuned Laya checkpoint on 6 of 8 benchmarks** —
-> holdout **0.7125 vs 0.425**, MiniWoB **0.9138 vs 0.6638**, JevBench hard
-> **0.4144 vs 0.243** — and runs at **27 ms/decision on a 3080** (31× faster than
-> the hosted Jev API). One line to use:
-> `LayaTorchBackend(model="ichenney/laya-browser-v32b", subfolder="v32b")`.
-> [Full comparison →](#benchmarks)
+The committed nine-metric comparison is historical: v32b wins 5 and loses 4 against
+the official browser-tuned reference; the corresponding eight-metric correctness view
+wins 5 and loses 3. These are diagnosis-file results, not a claim of new inference.
+The published checkpoint also has 95-case deployment counterevidence, and v37 has not
+passed runtime acceptance; this repository makes no v37 availability claim.
 
 ```python
 from localdecide import BrowserDecider
@@ -53,7 +59,7 @@ Measured on an M4 MacBook Air, 16 GB (see [Benchmarks](#benchmarks)):
 | Decision latency | **10–30 ms** steady state, **~150 ms** with a 60-element page (upstream p50: 38 ms for 1 question) |
 | Throughput | **up to ~100 decisions/second** |
 | Cost | **$0.00** — no API, no metering |
-| Model size | 322 M params (~644 MB) on disk |
+| Model size | v32b is ~1.3 GB; legacy v10s is ~650 MB |
 | Calibration | upstream reports **ECE 0.030** across 13 task families (post-temperature-scaling) |
 | Page content sent to a server | **none** |
 
@@ -67,7 +73,7 @@ Measured on an M4 MacBook Air, 16 GB (see [Benchmarks](#benchmarks)):
 | Where it runs | TypeSafe's cloud | anywhere PyTorch runs | **your machine** — MLX on Apple Silicon, PyTorch elsewhere |
 | Wire format | `POST /v1/systemone` | same contract | speaks it too (`POST /v1/systemone`) |
 | Cost | $0.042/M input tokens | free | free |
-| Browser harness | [jev-ultrafast](https://github.com/browser-use/jev-ultrafast) (18.8k★) | — | **included**: loop, drivers, guards, skills |
+| Browser harness | [jev-ultrafast](https://github.com/browser-use/jev-ultrafast) | — | **included**: loop, drivers, guards, skills |
 | Page leaves your machine | yes | no | **no** |
 
 ### Verified against the real Jev API
@@ -161,27 +167,30 @@ Two more batteries round out the picture:
 
 | family (21 cases) | local v10s | hosted jev-1.13.0 |
 |---|---|---|
-| pool-lead triage: `relevant` noul | 3/7 labelled correct | **7/7** |
+| pool-lead triage: `relevant` noul (10 cases) | **6/10** | **10/10** |
 | pool `lead_quality` score (0-4) | low-biased (1.0-2.0) | **calibrated (2.4-3.7)** |
-| Chinese SMS: transaction / type | **6/8** | 6/8 |
-| Chinese SMS: **phishing detection** | **0/3** | **3/3** |
+| Chinese SMS: joint transaction/type/phishing (8 cases) | **5/8** | **5/8** |
 | robustness (empty / 5k chars / adversarial) | 3/3 | 3/3 |
 | median latency | **36 ms** | 738 ms |
 
 The phishing row deserves a stare: local v10s scored the classic "妈妈，我手机坏了…快转5000" scam at p=0.14 and the lucky-red-packet scam at p=0.23 — it would wave both through. Hosted Jev put both at p=0.96. For any safety-adjacent routing (fraud, abuse, self-harm), local v10s in its current form is not safe to trust alone.
 
-**Browser edge cases** (`jev_edge_h2h.py` — goals where restraint is the right answer, 9 cases): local 4/9, hosted 5/9, and they fail in *opposite* directions. Local v10s is a fire-and-act model: it clicks "Delete my account" (p=0.93) when asked to delete *the entire website*, unticks an already-unticked checkbox, and clicks a disabled button — near-certain confidence every time. Hosted Jev blocks the impossible goals but also over-blocks legitimate ones (missed "Delete my account" as a real goal). Neither engine has a trustworthy notion of "this goal cannot be done here" yet; the harness's own guards (disabled-element checks, confirmation gates) are what catch these today.
+**Browser edge cases** (`jev_edge_h2h.py` — goals where restraint is the right answer, 9 cases):
+the historical 4/9 vs 5/9 result was operation-only. The scorer now reports operation,
+target, and joint correctness separately, and the fixture gold was corrected to use the
+genuinely unchecked newsletter control. Do not treat the old checked-fixture row as a
+new-model result. Local v10s is a fire-and-act model; hosted Jev blocks some impossible
+goals but also over-blocks legitimate ones. The harness's own disabled-element checks and
+confirmation gates remain the safety boundary.
 
 Practical summary across all four batteries: use hosted Jev when accuracy and safety calibration matter and per-call cost is fine; use local v10s when latency (10-20x faster), privacy, or free-at-volume matters, and let the harness guards compensate for its overconfidence. Fine-tuning data for the weakest axes (Chinese grounding, phishing, restraint) is exactly what the training recipe in this repo's diagnostics produces.
 
-The phishing gap is a data problem, not an architecture ceiling: a September 2026
-arXiv study ([2609.23959](https://arxiv.org/abs/2609.23959)) LoRA-tunes a 4B model
-to output a single calibrated P(scam) in one forward pass and reaches AUROC .974
-with calibration error .052 on scam-call screening — the same readout this repo
-runs, better data. And Laya's upstream publishes the calibration numbers to aim
-for: [accuracy 0.753 at ECE 0.030](https://huggingface.co/convaiinnovations/laya)
-across 13 task families, which the v10s browser checkpoint does not inherit on
-text outside its browser training distribution (see the pool/SMS rows above).
+An independent September 2026 study ([2609.23959](https://arxiv.org/abs/2609.23959))
+reports AUROC .974 and calibration error .052 for a related typed-decision scam-screening
+task. That is contextual evidence, not a causal explanation of this repository's SMS
+results. Laya's upstream publishes [accuracy 0.753 at ECE 0.030](https://huggingface.co/convaiinnovations/laya)
+across 13 task families; those figures do not transfer automatically to the browser
+checkpoint or to text outside its training distribution.
 
 If you have read about Jev's "System One" model and want the same idea — typed,
 calibrated decisions instead of generated text — running locally for your browser
@@ -277,7 +286,7 @@ git clone https://github.com/ChenneyZhuang/laya-browser-agent
 cd laya-browser-agent
 python3.12 -m venv .venv && source .venv/bin/activate
 pip install -e '.[all,playwright,cdp]' pytest
-python -m pytest tests/test_contract.py -q     # 55 tests, no model needed
+LOCALDECIDE_SKIP_LIVE=1 python -m pytest -q     # full model-free collection
 ```
 
 On an M4 it prints the chip, memory, runtime, and runs a one-decision smoke test so a
@@ -316,7 +325,59 @@ Two things that do **not** change by device:
 - **The safety guards.** Validation, fail-open, confidence gate, toggle guard, loop guard —
   all pure Python, all identical, all CI-tested on every platform in the matrix.
 
-The model downloads once on first use (~644 MB) and is cached.
+The default v32b download is ~1.3 GB and the legacy v10s download is ~650 MB; both are
+cached after the first use.
+
+### Backend configuration and compatibility
+
+The bundled backends expose `model`, `subfolder`, and `revision` and forward them to the
+verified upstream runtime APIs. The recommended browser configuration is:
+
+```python
+from localdecide.backends.base import LayaMLXBackend, LayaTorchBackend
+
+mlx = LayaMLXBackend(model="ichenney/laya-browser-v32b", subfolder="v32b")
+torch = LayaTorchBackend(model="ichenney/laya-browser-v32b", subfolder="v32b")
+# The explicit legacy path remains available:
+legacy = LayaTorchBackend(model="browser-legacy", subfolder="v10s")  # historical revision pinned by default
+```
+
+The custom backend boundary stays deliberately small:
+
+```python
+class MyBackend:
+    def answer(self, state, questions):
+        return {"answers": {...}, "usage": {}}
+
+decider = Decider(backend=MyBackend())
+```
+
+For an arbitrary System One-shaped HTTP service, configure model, key, and transport
+timeout explicitly. The `Decider` timeout is the overall deadline; HTTP timeout is
+bounded by the remaining deadline:
+
+```python
+from localdecide import Decider
+from localdecide.backends.base import HTTPBackend
+
+backend = HTTPBackend("http://127.0.0.1:8791/v1/systemone",
+                      model="browser", api_key="example-key", timeout=10.0)
+decider = Decider(backend=backend, timeout=12.0, retries=1)
+```
+
+The legacy synchronous `answer(state, questions)` duck protocol is not forcibly
+interruptible from Python; a late result is rejected and no further call is made.
+
+### Security boundary
+
+Local MLX/PyTorch backends keep page state on the local machine. `HTTPBackend` sends
+the state and questions to the endpoint you configure, so use it only with a trusted
+local or private service. `api_key` becomes a Bearer header; keep real keys in
+`LOCALDECIDE_API_KEY` or a secret manager rather than source files or shell history.
+Password values are redacted from observations and `TYPE_TEXT` refuses password fields
+because this project does not provide vault access. Supply text explicitly and put a
+human `confirm` callback in front of irreversible actions such as sending, deleting,
+or paying.
 
 ## Three ways to use it
 
@@ -521,14 +582,14 @@ side; they are labeled as such and kept for provenance.
 
 **`model="browser"` now loads
 [ichenney/laya-browser-v32b](https://huggingface.co/ichenney/laya-browser-v32b)** —
-this project's own frozen-encoder head fine-tune that **beats the official
-`v10s` checkpoint on 6 of 8 benchmarks** (holdout **0.7125 vs 0.425**, MiniWoB
-**0.9138 vs 0.6638**, JevBench hard **0.4144 vs 0.243**). Zero code changes
-needed; it downloads once via HF Hub and runs offline after that. To stay on the
-upstream checkpoint, pass `model="browser-legacy"`.
+this project's own frozen-encoder head fine-tune. The committed final comparison
+has nine metrics: v32b wins 5 and loses 4 against the official browser-tuned
+reference. The corresponding eight-metric correctness view is wins 5, loses 3.
+These are historical diagnosis results; no new model run is implied. To stay on
+the upstream checkpoint, pass `model="browser-legacy"`.
 
-Full methodology, per-family breakdowns, the noul root-cause analysis, and every
-eval JSON: [`reports/v20/MULTIDIM_COMPARISON.md`](reports/v20/MULTIDIM_COMPARISON.md)
+Full methodology, per-family breakdowns, the noul analysis, and the selected committed
+diagnosis JSON: [`reports/v20/MULTIDIM_COMPARISON.md`](reports/v20/MULTIDIM_COMPARISON.md)
 and [`reports/v20/JEV_COMPARISON.md`](reports/v20/JEV_COMPARISON.md).
 The complete training story — every version, every failed path, all scripts —
 lives in the companion repo **[laya-training-log](https://github.com/ChenneyZhuang/laya-training-log)**.
@@ -606,7 +667,7 @@ a navigation link — and it is also exactly what the user asked the agent to cl
 filter that removes it turns a working agent into one that silently cannot do the task,
 and the failure is indistinguishable from a model error. Therefore scoping here is
 **goal-aware**: an element whose label overlaps the goal is never dropped, whatever else
-it looks like. Ten tests cover this (`TestScope`), including the one that caught a
+it looks like. The `TestScope` regressions cover this, including the one that caught a
 quote-handling bug (`'random` / `article'`) that silently disabled the protection.
 
 ### Multilingual pages: a grounding layer, not a bigger model
@@ -740,7 +801,6 @@ stated explicitly, because attribution matters more than a link dump.
 | [Nandakishor Mukkunnoth — *I Built Non-Autoregressive Decision Models with RL a Year Ago*](https://laya.convaiinnovations.com/) | The RLCD framing, the three primitives, and the honest limitations (options beyond ~20 degrade; zero-shot is weak; temperature calibration needed). |
 | [Laya BENCHMARKS.md](https://github.com/NandhaKishorM/laya/blob/main/BENCHMARKS.md) | The exact per-language and per-task numbers quoted in the caveats, including the Khmer/Armenian/Hebrew confidence failures that motivate confidence-gating being unreliable on its own. |
 | [arXiv 2609.23959 — *Open-Jev Judgments on CallScreenBench*](https://arxiv.org/abs/2609.23959) (Sep 2026) | Independent peer evidence that the typed-decision readout works for safety screening when the data is right: AUROC .974, calibration error .052, 64.5 ms/decision on a consumer GPU. Grounds the phishing claims in this README's text battery. |
-| [arXiv 2402.09769 — *Learning Using a Single Forward Pass*](https://arxiv.org/abs/2402.09769) | The non-autoregressive, single-forward-pass decision lineage this model class descends from. |
 | [jev.guide — Browser Use + Jev](https://jev.guide/en/explore), [madewithjev.com](https://madewithjev.com/categories/agents-and-browsers) | The survey of the ~60 independent browser/computer-use projects built on this model class — the evidence that this is a real pattern and not a single demo. |
 
 **Nothing here is a fork.** The models are dependencies. The design ideas are
@@ -793,7 +853,7 @@ localdecide/
   mcp_server.py    MCP over stdio for Claude Desktop / Cursor
   backends/        MLX, PyTorch, and HTTP backends behind one protocol
 skills/            portable SKILL.md files for agent harnesses
-tests/             39 tests covering the contract (no model needed)
+tests/             model-free contract, wire, MCP, packaging, and safety regressions
 examples/          runnable examples
 examples/diagnostics/   the measurement scripts behind the benchmark tables
 ```
@@ -802,9 +862,9 @@ examples/diagnostics/   the measurement scripts behind the benchmark tables
 
 ```bash
 git clone https://github.com/ChenneyZhuang/laya-browser-agent
-cd localdecide
+cd laya-browser-agent
 python3.12 -m venv .venv && .venv/bin/pip install -e '.[all]' pytest
-.venv/bin/python -m pytest tests/test_contract.py -q   # 48 tests, instant, no model needed
+.venv/bin/python -m pytest -q   # model-free collection; live tests are explicitly skipped
 .venv/bin/localdecide doctor
 ```
 

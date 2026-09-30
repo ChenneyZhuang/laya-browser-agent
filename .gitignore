@@ -32,6 +32,7 @@ models/
 # Scratch
 *.log
 /tmp/
+/handoff.md
 CODEX_3080_FINETUNE_TASK.md
 # HF upload staging (1.3GB checkpoint; lives on the Hub, not in git)
 hf-release/

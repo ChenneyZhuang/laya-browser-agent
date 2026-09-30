@@ -4,19 +4,24 @@
 
 > Este es el documento en español de laya-browser-agent. Para la versión más actual, ve [README.md](README.md).
 
-**Decisiones de agente de navegador impulsadas por Laya — el modelo System 1 de código abierto. Una alternativa local a TypeSafe Jev: sin nube, sin clave de API, sin capturas de pantalla.**
+**Soporte de decisiones restringidas y multi-backend para modelos tipo Jev.** Admite Laya
+con MLX/PyTorch, cualquier backend duck síncrono con `answer(state, questions)` y cualquier
+endpoint HTTP con forma System One. El checkpoint propio es una recomendación por defecto,
+no un modelo propietario obligatorio.
 
 [![tests](https://github.com/ChenneyZhuang/laya-browser-agent/actions/workflows/tests.yml/badge.svg)](https://github.com/ChenneyZhuang/laya-browser-agent/actions/workflows/tests.yml/badge.svg)
 [![HuggingFace](https://img.shields.io/badge/%F0%9F%A4%97-ichenney%2Flaya--browser--v32b-yellow)](https://huggingface.co/ichenney/laya-browser-v32b)
 
 Un modelo de decisión responde preguntas tipadas sobre un estado y devuelve **probabilidades calibradas** en lugar de texto generado — por lo que no puede alucinar una instrucción. Esta es exactamente la forma correcta para la parte de *decidir* de un agente de navegador: dale una tabla numerada de los controles de una página y te dirá qué operación ejecutar y sobre qué elemento.
 
-> **🚀 Checkpoint propio ahora por defecto: supera al oficial en 6 de 8 benchmarks.**
-> `model="browser"` carga ahora **[ichenney/laya-browser-v32b](https://huggingface.co/ichenney/laya-browser-v32b)** —
-> holdout **0.7125 vs 0.425**, MiniWoB **0.9138 vs 0.6638**, JevBench hard **0.4144 vs 0.243**,
-> con **27 ms/decisión** en una 3080 (31× más rápido que la API de Jev). Sin cambios de código;
-> se descarga una vez desde HF Hub y luego funciona offline. Para el checkpoint oficial:
-> `model="browser-legacy"`
+`model="browser"` recomienda **[ichenney/laya-browser-v32b](https://huggingface.co/ichenney/laya-browser-v32b)**
+en el subdirectorio `v32b`; `model="browser-legacy"` usa la ruta `v10s` de
+`cklxx/laya-browser`. Como `main` upstream ya no contiene ese directorio histórico, el alias
+legacy fija por defecto la revisión `adf912be85ff9221ee171551778456b133c1af75`; `revision=` la puede sobrescribir.
+La comparación histórica comprometida tiene nueve métricas: 5 victorias y
+4 derrotas; la vista de ocho métricas de corrección tiene 5 victorias y 3 derrotas. No es inferencia
+nueva. El checkpoint publicado tiene contraevidencia de despliegue en 95 casos; v37 aún no pasó
+la aceptación del runtime y aquí no se afirma que esté disponible.
 
 ## Instalación
 
@@ -30,6 +35,45 @@ localdecide doctor           # diagnóstico de hardware + prueba de humo
 
 El checkpoint v32b por defecto se descarga una sola vez (~1,3 GB; el `browser-legacy`
 v10s oficial: ~650 MB). Después funciona totalmente offline.
+
+`model`, `subfolder` y `revision` se exponen y se pasan a los runtimes upstream verificados.
+`HTTPBackend` acepta `model`, `api_key` y `timeout`; un backend propio solo necesita
+`answer(state, questions)` y devolver `{"answers": {...}, "usage": {...}}`. El timeout total
+de `Decider` limita el timeout HTTP restante. Un backend duck síncrono no puede cancelarse a la
+fuerza desde Python: un resultado tardío se rechaza y no se hacen más llamadas.
+
+### Configuración del backend, timeouts y límite de seguridad
+
+Este ejemplo usa el nombre real del modelo v32b y muestra una API key, el timeout HTTP
+y un backend personalizado:
+
+```python
+from localdecide import Decider
+from localdecide.backends.base import HTTPBackend, LayaTorchBackend
+
+local = LayaTorchBackend(model="ichenney/laya-browser-v32b", subfolder="v32b")
+
+class MyBackend:
+    name = "my-local-backend"
+    def answer(self, state, questions):
+        return {"answers": {}, "usage": {}}
+
+remote = HTTPBackend(
+    "http://127.0.0.1:8791/v1/systemone",
+    model="browser", api_key="example-key", timeout=10.0,
+)
+decider = Decider(backend=remote, timeout=12.0, retries=1)
+```
+
+Los backends locales MLX/PyTorch no envían el estado de la página fuera de tu máquina.
+`HTTPBackend` sí envía el estado y las preguntas al endpoint configurado, así que úsalo
+solo con un servicio local o privado de confianza. `api_key` se convierte en un header
+Bearer; guarda la clave real en `LOCALDECIDE_API_KEY` o un gestor de secretos, no en el
+código ni en el historial del shell. Los valores de contraseña se redactan en la observación
+y `TYPE_TEXT` rechaza los campos de contraseña porque el proyecto no ofrece acceso a un vault.
+Proporciona el texto explícitamente y usa un callback humano `confirm` para enviar, borrar,
+pagar u otras acciones irreversibles. Un backend duck síncrono no se puede interrumpir a la
+fuerza desde Python: se rechaza el resultado tardío y no se vuelve a llamar.
 
 ## Mediciones (M4, 16 GB)
 
@@ -58,11 +102,11 @@ v10s oficial: ~650 MB). Después funciona totalmente offline.
 | JevBench easy | 0.8542 | 0.979 | 1.0000 |
 | Latencia (p50) | **27 ms** (RTX 3080) | — | 854 ms (red) |
 
-En la categoría local (gratis, offline), v32b gana en 6 de 8 benchmarks frente al checkpoint oficial. Frente a la API en la nube de Jev sigue habiendo brecha de precisión absoluta, pero v32b es **gratis, privado (el contenido de la página nunca sale de tu máquina), offline y 31× más rápido**, e incluso invierte el resultado en preguntas `score` (0.667 vs 0.333) y `temporal_numeric` (0.33 vs 0.20). Detalles: [Benchmarks en inglés](README.md#benchmarks) y [JEV_COMPARISON.md](reports/v20/JEV_COMPARISON.md).
+La comparación histórica comprometida suma 9 métricas: 5 victorias y 4 derrotas; la vista de 8 métricas de corrección suma 5 victorias y 3 derrotas. Frente a la API en la nube de Jev sigue habiendo brecha de precisión absoluta, pero el valor local es **gratuito, privado y offline**. Detalles: [Benchmarks en inglés](README.md#benchmarks) y [JEV_COMPARISON.md](reports/v20/JEV_COMPARISON.md).
 
 ### Enfrentamiento contra el Jev oficial: datos medidos
 
-Estas baterías son anteriores a v32b; el lado local usaba el checkpoint oficial v10s de entonces (se conservan como registro histórico; v32b supera a v10s en 6 de 8 benchmarks, ver tabla superior). `examples/diagnostics/jev_head_to_head.py` (un paso) y `jev_flow_h2h.py` (flujos completos) ejecutan las mismas tareas contra el Laya v10s local y el jev-1.13.0 oficial:
+Estas baterías son anteriores a v32b; el lado local usaba el checkpoint oficial v10s de entonces y se conservan como registro histórico, no como inferencia nueva. `examples/diagnostics/jev_head_to_head.py` (un paso) y `jev_flow_h2h.py` (flujos completos) ejecutan las mismas tareas contra el Laya v10s local y el jev-1.13.0 oficial:
 
 | Un paso, sin contexto (12 metas / 6 idiomas) | local v10s | Jev oficial |
 |---|---|---|
@@ -87,16 +131,15 @@ El dialecto `systemone` de este repositorio fue validado de extremo a extremo co
 
 | tarea | local v10s | Jev oficial |
 |---|---|---|
-| leads de piscina `relevant` | 3/7 correctos | **7/7** |
+| leads de piscina `relevant` (10 casos) | **6/10** | **10/10** |
 | calidad de lead (0-4) | sesgo bajo (1.0-2.0) | **calibrado (2.4-3.7)** |
-| SMS chino: transacción/tipo | **6/8** | 6/8 |
-| SMS chino: **detección de phishing** | **0/3** | **3/3** |
+| SMS chino: joint transacción/tipo/phishing (8 casos) | **5/8** | **5/8** |
 | robustez (vacío/5k caracteres/adversarial) | 3/3 | 3/3 |
 | latencia mediana | **36ms** | 738ms |
 
 La fila de phishing merece atención: v10s local dio p=0.14 a la estafa clásica "mamá, se me rompió el teléfono… transfiere 5000" y p=0.23 a la del sobre rojo — las dejaría pasar. Jev oficial: p=0.96 en ambas. **Para cualquier enrutado sensible a seguridad, el modelo local solo no es confiable hoy.**
 
-**Casos extremos de navegador** (`jev_edge_h2h.py`, 9 casos donde lo correcto es abstenerse): local 4/9, oficial 5/9, y fallan en direcciones opuestas. v10s es de disparar primero: pide borrar el sitio web entero y pulsa "Delete my account" (p=0.93), desmarca lo ya desmarcado y clica botones deshabilitados, siempre con ~0.9 de confianza. El Jev oficial bloquea lo imposible pero también bloquea metas legítimas. Ninguno tiene aún un concepto fiable de "esta meta no se puede lograr"; los guards del harness son lo que salva estos casos hoy.
+**Casos extremos de navegador** (`jev_edge_h2h.py`, 9 casos): el antiguo 4/9 frente a 5/9 medía solo la operación. El scorer ahora separa operación, objetivo y joint; el gold se corrigió para usar el control newsletter realmente desmarcado. La fila del fixture marcado anterior no es un resultado de un modelo nuevo.
 
 Conclusión práctica de las cuatro baterías: precisión y calibración de seguridad → Jev oficial; latencia (10-20x más rápido), privacidad o volumen gratuito → local + guards. El grounding chino, el phishing y la contención son exactamente los ejes a afinar con el fine-tuning.
 ## Relación con Jev y Laya
@@ -113,7 +156,7 @@ Detalles completos en el [README en inglés](README.md).
 
 ### Respaldo en la literatura
 
-- [arXiv 2609.23959](https://arxiv.org/abs/2609.23959) (sep 2026): evidencia independiente de pares — el mismo mecanismo de decisión tipada aplicado a cribado de fraude alcanza AUROC .974, error de calibración .052 y 64.5 ms/decisión en una GPU de consumo cuando los datos son adecuados. La debilidad de phishing vista en la batería de texto es un problema de datos, no de arquitectura.
+- [arXiv 2609.23959](https://arxiv.org/abs/2609.23959) (sep 2026): una tarea relacionada de cribado de estafas con typed decisions informa AUROC .974 y error de calibración .052; es contexto, no una explicación causal de los SMS de este proyecto.
 - El upstream de Laya publica su calibración: **accuracy 0.753 @ ECE 0.030** en 13 familias de tareas (tras escalado de temperatura). El checkpoint v10s no hereda ese nivel en texto fuera de su distribución de entrenamiento (ver filas de pool/SMS arriba).
 
 ## Licencia

@@ -184,7 +184,7 @@ class Scope:
         """
         from .grounding import ground_goal
 
-        actions = list(observation.get("actions", []) or [])
+        actions = list(observation.get("actions") or observation.get("elements") or [])
         tokens = goal_tokens(goal) if goal else []
         kept = [action for action in actions if self.keep(action, tokens)]
 

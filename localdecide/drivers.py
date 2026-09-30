@@ -43,7 +43,6 @@ OBSERVE_JS = r"""
     if (aria) return clean(aria);
     if (el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA') {
       if (el.placeholder) return clean(el.placeholder);
-      if (el.value) return clean(el.value);
     }
     const text = clean(el.innerText || el.textContent);
     if (text) return text;
@@ -90,20 +89,27 @@ OBSERVE_JS = r"""
                      (role === 'textbox' || role === 'searchbox');
     const selectable = tag === 'select';
     if (!clickable && !editable && !selectable) return;
-    const label = labelOf(el);
+    const sensitive = tag === 'input' && String(el.type || '').toLowerCase() === 'password';
+    const label = labelOf(el) || (sensitive ? 'Password field' : '');
     if (!label) return;
-    const key = tag + '|' + role + '|' + label + '|' + i;
+    if (!el.__localdecide_handle) {
+      window.__localdecide_next_handle = (window.__localdecide_next_handle || 0) + 1;
+      el.__localdecide_handle = 'localdecide-' + window.__localdecide_next_handle;
+    }
+    const key = el.__localdecide_handle;
     if (seen.has(key)) return;
     seen.add(key);
     const item = {kind: selectable ? 'select' : (editable ? 'fill' : 'click'),
-                  label, role, node: key, index: out.length + 1};
-    if (editable) item.current_value = el.value || '';
+                  label, role, node: key, index: out.length + 1, sensitive};
+    if (editable && !sensitive) item.current_value = el.value || '';
     if (selectable) {
       item.current_value = el.value || '';
       item.options = Array.from(el.options).slice(0, 200).map(o => ({label: clean(o.textContent), value: o.value || ''}));
     }
     if (el.type === 'checkbox' || el.type === 'radio' || role === 'checkbox' || role === 'radio') item.checked = !!el.checked;
     if (el.disabled) item.disabled = true;
+    item.identity = {tag, role, type: String(el.type || ''), label,
+                     disabled: !!el.disabled, read_only: !!el.readOnly, sensitive};
     const rect = el.getBoundingClientRect();
     item.bbox = {x: Math.round(rect.x), y: Math.round(rect.y), w: Math.round(rect.width), h: Math.round(rect.height)};
     out.push(item);
@@ -121,6 +127,22 @@ class _BaseDriver:
         self._last_signature: Optional[str] = None
 
     def _observe_common(self, url: str, title: str, text: str, actions: List[Dict[str, Any]]) -> Dict[str, Any]:
+        safe_actions: List[Dict[str, Any]] = []
+        for action in actions:
+            safe = dict(action)
+            role = str(safe.get("role", "") or "").lower()
+            input_type = str(safe.get("type", "") or "").lower()
+            sensitive = bool(safe.get("sensitive")) or role == "password" or input_type == "password"
+            if sensitive:
+                supplied = {str(safe.get(key, "") or "") for key in ("value", "current_value")}
+                label = str(safe.get("label", "") or "").strip()
+                if not label or label in supplied:
+                    safe["label"] = "Password field"
+                safe.pop("value", None)
+                safe.pop("current_value", None)
+                safe["sensitive"] = True
+            safe_actions.append(safe)
+        actions = safe_actions
         signature = f"{url}|{len(actions)}|{text[:200]}"
         changed = signature != self._last_signature
         self._last_signature = signature
@@ -157,18 +179,26 @@ class PlaywrightDriver(_BaseDriver):
             self._previous_loop = None
         self._loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self._loop)
-        self._pw = sync_playwright().start()
-        launch: Dict[str, Any] = {"headless": headless}
-        if user_data_dir:
-            self._context = self._pw.chromium.launch_persistent_context(user_data_dir, **launch)
-            self._page = self._context.pages[0] if self._context.pages else self._context.new_page()
-        else:
-            self._browser = self._pw.chromium.launch(**launch)
-            self._context = None
-            self._page = self._browser.new_page()
-        if start_url and start_url != "about:blank":
-            self._page.goto(start_url, wait_until="domcontentloaded")
-            self._settle()
+        self._pw = None
+        self._browser = None
+        self._context = None
+        self._page = None
+        self._closed = False
+        try:
+            self._pw = sync_playwright().start()
+            launch: Dict[str, Any] = {"headless": headless}
+            if user_data_dir:
+                self._context = self._pw.chromium.launch_persistent_context(user_data_dir, **launch)
+                self._page = self._context.pages[0] if self._context.pages else self._context.new_page()
+            else:
+                self._browser = self._pw.chromium.launch(**launch)
+                self._page = self._browser.new_page()
+            if start_url and start_url != "about:blank":
+                self._page.goto(start_url, wait_until="domcontentloaded")
+                self._settle()
+        except BaseException:
+            self.close()
+            raise
 
     def _settle(self) -> None:
         """Give a just-navigated page a moment to finish firing its own loads.
@@ -183,6 +213,13 @@ class PlaywrightDriver(_BaseDriver):
         except Exception:
             pass  # a page with long-poll connections never goes idle; carry on
         self._page.wait_for_timeout(self.settle_ms)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.close()
+        return False
 
     def observe(self) -> Dict[str, Any]:
         from playwright.sync_api import Error as PlaywrightError
@@ -214,21 +251,15 @@ class PlaywrightDriver(_BaseDriver):
             elif operation in ("CLICK", "TYPE_TEXT", "SELECT"):
                 if element is None:
                     return {"ok": False, "detail": "no element"}
-                handle = self._resolve(element)
-                box = handle.bounding_box()
-                if box is None:
-                    return {"ok": False, "detail": "element not visible"}
+                handle = self._resolve(element, operation)
                 if operation == "CLICK":
                     handle.click(timeout=5000)
                 elif operation == "TYPE_TEXT" and text is not None:
                     handle.fill(text, timeout=5000)
                 elif operation == "SELECT":
-                    # The loop already resolved the observed option to a value; drive the
-                    # real <select> by its bounding box so no selector is ever invented.
                     if not text:
                         return {"ok": False, "detail": "SELECT with no option value"}
-                    if not self._select_by_bbox(box, text):
-                        return {"ok": False, "detail": f"option {text!r} not present in the dropdown"}
+                    handle.select_option(text, timeout=5000)
                 else:
                     return {"ok": False, "detail": f"{operation} needs a payload the loop did not provide"}
         except PlaywrightError as error:
@@ -249,48 +280,48 @@ class PlaywrightDriver(_BaseDriver):
         self._last_url_signature = signature
         return {"ok": True, "detail": "ok", "page_changed": changed}
 
-    def _resolve(self, element: ElementRef):
-        meta = element.meta or {}
-        bbox = meta.get("bbox") or {}
-        x = bbox.get("x", 0) + max(1, bbox.get("w", 2) // 2)
-        y = bbox.get("y", 0) + max(1, bbox.get("h", 2) // 2)
-        return _PointHandle(self._page, x, y)
-
-    def _select_by_bbox(self, box: Dict[str, int], value: str) -> bool:
-        """Select an option in the <select> whose box we were given.
-
-        Driving a native dropdown by keyboard is the only approach that works without
-        inventing a CSS selector: focus the control, walk its options with the keyboard,
-        and read back `value` to confirm the choice landed. If the option is not there,
-        say so - a silent failure here would look like the model picked wrong.
-        """
-        x = box["x"] + max(1, box["width"] // 2)
-        y = box["y"] + max(1, box["height"] // 2)
-        self._page.mouse.click(x, y)
-        element_handle = self._page.evaluate_handle(
-            "([x, y]) => document.elementFromPoint(x, y)", [x, y]
-        )
-        element = element_handle.as_element()
-        if element is None:
-            return False
-        options = element.evaluate("(el) => el.tagName === 'SELECT' ? "
-                                   "Array.from(el.options).map(o => ({value: o.value, label: o.textContent})) : null")
-        if not options:
-            # Not a native select - a custom dropdown. Try typing the option label.
-            self._page.keyboard.type(value)
-            self._page.keyboard.press("Enter")
-            return True
-        index = next((i for i, option in enumerate(options) if option["value"] == value), None)
-        if index is None:
-            return False
-        # Home, then down N times: works regardless of how the page renders the list.
-        self._page.keyboard.press("Home")
-        for _ in range(index):
-            self._page.keyboard.press("ArrowDown")
-        self._page.keyboard.press("Enter")
-        self._page.wait_for_timeout(120)
-        current = element.evaluate("(el) => el.value")
-        return str(current) == str(value)
+    def _resolve(self, element: ElementRef, operation: str):
+        """Resolve and validate the same DOM node that observation assigned a handle to."""
+        if not isinstance(element.handle, str) or not element.handle:
+            raise RuntimeError("target has no stable observation handle")
+        payload = {"handle": element.handle, "expected": element.meta.get("identity", {}),
+                   "operation": operation}
+        handle = self._page.evaluate_handle(
+            """(payload) => {
+                const labelOf = (el) => {
+                  if (el.labels && el.labels.length) return (el.labels[0].innerText || '').replace(/\\s+/g, ' ').trim().slice(0, 120);
+                  const aria = el.getAttribute && (el.getAttribute('aria-label') || el.getAttribute('title'));
+                  if (aria) return aria.replace(/\\s+/g, ' ').trim().slice(0, 120);
+                  if (el.placeholder) return el.placeholder.replace(/\\s+/g, ' ').trim().slice(0, 120);
+                  const text = (el.innerText || el.textContent || '').replace(/\\s+/g, ' ').trim();
+                  return text.slice(0, 120);
+                };
+                const roleOf = (el) => el.getAttribute('role') ||
+                  ({a:'link',button:'button',input:el.type || 'input',select:'select',textarea:'textbox',summary:'button'}[el.tagName.toLowerCase()] || el.tagName.toLowerCase());
+                const el = Array.from(document.querySelectorAll('*')).find(node => node.__localdecide_handle === payload.handle);
+                if (!el || !el.isConnected) throw new Error('target is missing or was replaced');
+                const identity = payload.expected || {};
+                const actualLabel = labelOf(el) || (String(el.type || '').toLowerCase() === 'password' ? 'Password field' : '');
+                if (identity.label && actualLabel !== identity.label) throw new Error('target identity changed: label');
+                if (identity.tag && el.tagName.toLowerCase() !== identity.tag) throw new Error('target identity changed: tag');
+                if (identity.role && roleOf(el) !== identity.role) throw new Error('target identity changed: role');
+                if (el.disabled) throw new Error('target is disabled');
+                if (payload.operation === 'TYPE_TEXT' && (el.readOnly || String(el.type || '').toLowerCase() === 'password' || identity.sensitive))
+                  throw new Error(String(el.type || '').toLowerCase() === 'password' || identity.sensitive
+                    ? 'password input rejected: vault access is not provided by this project'
+                    : 'target is read-only');
+                if (payload.operation === 'SELECT' && el.tagName.toLowerCase() !== 'select') throw new Error('target is not a select');
+                const style = getComputedStyle(el);
+                const rect = el.getBoundingClientRect();
+                if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0' || rect.width < 1 || rect.height < 1)
+                  throw new Error('target is not actionable');
+                const top = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+                if (top && top !== el && !el.contains(top)) throw new Error('target is covered');
+                return el;
+            }""", payload).as_element()
+        if handle is None:
+            raise RuntimeError("target is not a DOM element")
+        return handle
 
     def close(self) -> None:
         # Idempotent: the loop is closed on the first call, and a second close must be a
@@ -303,47 +334,30 @@ class PlaywrightDriver(_BaseDriver):
         self._closed = True
         try:
             if getattr(self, "_context", None) is not None:
-                self._context.close()
+                try:
+                    self._context.close()
+                except Exception:
+                    pass
             elif getattr(self, "_browser", None) is not None:
-                self._browser.close()
+                try:
+                    self._browser.close()
+                except Exception:
+                    pass
         finally:
-            self._pw.stop()
+            try:
+                if getattr(self, "_pw", None) is not None:
+                    self._pw.stop()
+            except Exception:
+                pass
             # Restore the caller's event loop so a subsequent driver (or any asyncio
             # work in the same process) starts clean instead of finding a closed loop.
             import asyncio
-            asyncio.set_event_loop(self._previous_loop)
-
-
-class _PointHandle:
-    """Minimal click/type helper at a coordinate. Keeps the driver honest: the model
-    picked an element we observed, and this is where that element was."""
-
-    def __init__(self, page, x: int, y: int) -> None:
-        self.page, self.x, self.y = page, x, y
-
-    def bounding_box(self):
-        return {"x": self.x, "y": self.y, "width": 2, "height": 2}
-
-    def click(self, timeout: int = 5000) -> None:
-        self.page.mouse.click(self.x, self.y)
-
-    def fill(self, text: str, timeout: int = 5000) -> None:
-        self.page.mouse.click(self.x, self.y)
-        # Actionability guard (per Playwright's auto-wait philosophy): typing is only
-        # meaningful into an editable target. If the click landed on anything else
-        # (a label, the body, a link), say so instead of spraying keystrokes.
-        tag = self.page.evaluate(
-            "([x, y]) => { const el = document.elementFromPoint(x, y);"
-            " if (!el) return null;"
-            " const t = el.tagName.toLowerCase();"
-            " return (t === 'input' || t === 'textarea' || el.isContentEditable) ? t : null; }",
-            [self.x, self.y],
-        )
-        if tag is None:
-            from playwright.sync_api import Error as PlaywrightError
-            raise PlaywrightError("fill target is not an editable element (input/textarea/contenteditable)")
-        self.page.keyboard.press("Meta+A" if self.page.evaluate("navigator.platform.includes('Mac')") else "Control+A")
-        self.page.keyboard.type(text)
+            try:
+                asyncio.set_event_loop(self._previous_loop)
+            finally:
+                owned_loop = getattr(self, "_loop", None)
+                if owned_loop is not None and not owned_loop.is_closed():
+                    owned_loop.close()
 
 
 class CDPDriver(_BaseDriver):
@@ -367,7 +381,7 @@ class CDPDriver(_BaseDriver):
             tabs = json.loads(response.read().decode("utf-8"))
         pages = [tab for tab in tabs if tab.get("type") == "page"]
         if target_url_contains:
-            pages = [tab for tab in pages if target_url_contains in tab.get("url", "")] or pages
+            pages = [tab for tab in pages if target_url_contains in tab.get("url", "")]
         if not pages:
             raise RuntimeError("no attachable page found over CDP")
         self.target = pages[0]
@@ -384,10 +398,18 @@ class CDPDriver(_BaseDriver):
             if data.get("id") == self._id:
                 if "error" in data:
                     raise RuntimeError(data["error"].get("message", "CDP error"))
-                return data.get("result", {})
+                result = dict(data.get("result", {}) or {})
+                if "exceptionDetails" in data:
+                    result["exceptionDetails"] = data["exceptionDetails"]
+                return result
 
     def _eval(self, expression: str) -> Any:
         result = self._call("Runtime.evaluate", expression=expression, returnByValue=True, awaitPromise=True)
+        if result.get("exceptionDetails"):
+            details = result["exceptionDetails"]
+            exception = details.get("exception", {}) if isinstance(details, dict) else {}
+            message = exception.get("description") or details.get("text") or "Runtime.evaluate failed"
+            raise RuntimeError(message)
         return result.get("result", {}).get("value")
 
     def observe(self) -> Dict[str, Any]:
@@ -407,15 +429,24 @@ class CDPDriver(_BaseDriver):
             elif operation == "WAIT":
                 import time
                 time.sleep(0.3)
-            elif operation in ("CLICK", "TYPE_TEXT"):
+            elif operation in ("CLICK", "TYPE_TEXT", "SELECT"):
                 if element is None:
                     return {"ok": False, "detail": "no element"}
-                x, y = self._center(element)
-                for event_type in ("mousePressed", "mouseReleased"):
-                    self._call("Input.dispatchMouseEvent", type=event_type, x=x, y=y,
-                               button="left", clickCount=1)
-                if operation == "TYPE_TEXT" and text is not None:
+                target = self._target_state(element, operation)
+                if operation == "CLICK":
+                    x, y = target["x"], target["y"]
+                    for event_type in ("mousePressed", "mouseReleased"):
+                        self._call("Input.dispatchMouseEvent", type=event_type, x=x, y=y,
+                                   button="left", clickCount=1)
+                elif operation == "TYPE_TEXT" and text is not None:
+                    self._eval(self._target_expression(element, operation, action="focus"))
                     self._call("Input.insertText", text=text)
+                elif operation == "SELECT" and text:
+                    changed = self._eval(self._target_expression(element, operation, value=text, action="select"))
+                    if not changed:
+                        return {"ok": False, "detail": f"option {text!r} not present in the dropdown"}
+                else:
+                    return {"ok": False, "detail": f"{operation} needs a payload the loop did not provide"}
             else:
                 return {"ok": False, "detail": f"unsupported {operation}"}
         except Exception as error:
@@ -434,11 +465,57 @@ class CDPDriver(_BaseDriver):
         self._last_url_signature = signature
         return {"ok": True, "detail": "ok", "page_changed": changed}
 
-    def _center(self, element: ElementRef) -> tuple:
-        bbox = (element.meta or {}).get("bbox") or {}
-        x = int(bbox.get("x", 0) + max(1, bbox.get("w", 2) // 2))
-        y = int(bbox.get("y", 0) + max(1, bbox.get("h", 2) // 2))
-        return x, y
+    def _target_expression(self, element: ElementRef, operation: str, *, action: str = "validate",
+                           value: str = "") -> str:
+        payload = json.dumps({"handle": element.handle, "expected": element.meta.get("identity", {}),
+                              "operation": operation, "action": action, "value": value})
+        return f"""(() => {{
+          const payload = {payload};
+          const labelOf = (el) => {{
+            if (el.labels && el.labels.length) return (el.labels[0].innerText || '').replace(/\\s+/g, ' ').trim().slice(0, 120);
+            const aria = el.getAttribute && (el.getAttribute('aria-label') || el.getAttribute('title'));
+            if (aria) return aria.replace(/\\s+/g, ' ').trim().slice(0, 120);
+            if (el.placeholder) return el.placeholder.replace(/\\s+/g, ' ').trim().slice(0, 120);
+            return (el.innerText || el.textContent || '').replace(/\\s+/g, ' ').trim().slice(0, 120);
+          }};
+          const roleOf = (el) => el.getAttribute('role') ||
+            ({{a:'link',button:'button',input:el.type || 'input',select:'select',textarea:'textbox',summary:'button'}}[el.tagName.toLowerCase()] || el.tagName.toLowerCase());
+          const el = Array.from(document.querySelectorAll('*')).find(node => node.__localdecide_handle === payload.handle);
+          if (!el || !el.isConnected) throw new Error('target is missing or was replaced');
+          const identity = payload.expected || {{}};
+          const actualLabel = labelOf(el) || (String(el.type || '').toLowerCase() === 'password' ? 'Password field' : '');
+          if (identity.label && actualLabel !== identity.label) throw new Error('target identity changed: label');
+          if (identity.tag && el.tagName.toLowerCase() !== identity.tag) throw new Error('target identity changed: tag');
+          if (identity.role && roleOf(el) !== identity.role) throw new Error('target identity changed: role');
+          if (el.disabled) throw new Error('target is disabled');
+          if (payload.operation === 'TYPE_TEXT' && (el.readOnly || String(el.type || '').toLowerCase() === 'password' || identity.sensitive))
+            throw new Error(String(el.type || '').toLowerCase() === 'password' || identity.sensitive
+              ? 'password input rejected: vault access is not provided by this project' : 'target is read-only');
+          if (payload.operation === 'SELECT' && el.tagName.toLowerCase() !== 'select') throw new Error('target is not a select');
+          const style = getComputedStyle(el), rect = el.getBoundingClientRect();
+          if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0' || rect.width < 1 || rect.height < 1)
+            throw new Error('target is not actionable');
+          const top = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+          if (top && top !== el && !el.contains(top)) throw new Error('target is covered');
+          if (payload.action === 'focus') {{ el.focus(); if (typeof el.select === 'function') el.select(); return true; }}
+          if (payload.action === 'select') {{
+            const option = Array.from(el.options || []).find(item => String(item.value) === String(payload.value));
+            if (!option) return false;
+            el.focus(); el.value = payload.value;
+            el.dispatchEvent(new Event('input', {{bubbles: true}}));
+            el.dispatchEvent(new Event('change', {{bubbles: true}}));
+            return true;
+          }}
+          return {{x: Math.round(rect.left + rect.width / 2), y: Math.round(rect.top + rect.height / 2)}};
+        }})()"""
+
+    def _target_state(self, element: ElementRef, operation: str) -> Dict[str, Any]:
+        if not isinstance(element.handle, str) or not element.handle:
+            raise RuntimeError("target has no stable observation handle")
+        state = self._eval(self._target_expression(element, operation))
+        if not isinstance(state, dict) or "x" not in state or "y" not in state:
+            raise RuntimeError("target validation returned no current geometry")
+        return state
 
     def close(self) -> None:
         if getattr(self, "_closed", False):

@@ -46,8 +46,7 @@ class LayaMLXBackend:
     """
 
     name = "laya-mlx"
-    # Default: our fine-tuned v32b checkpoint (beats the official v10s on 6/8
-    # benchmarks; see README "Benchmarks"). Falls back cleanly: pass
+    # Default: our fine-tuned v32b checkpoint. Falls back cleanly: pass
     # model="browser-legacy" for the upstream cklxx v10s checkpoint.
     # The base `convaiinnovations/laya` checkpoints are near-chance at picking a
     # control (documented top-1 ~0.10 among ~45 candidates), so browser work needs
@@ -56,8 +55,13 @@ class LayaMLXBackend:
     BROWSER_SUBFOLDER = "v32b"
     LEGACY_BROWSER_MODEL = "cklxx/laya-browser"
     LEGACY_BROWSER_SUBFOLDER = "v10s"
+    # cklxx/laya-browser removed v10s from main after publishing newer checkpoints.
+    # Keep the compatibility alias reproducible instead of silently resolving to a
+    # moving branch where the promised subfolder no longer exists.
+    LEGACY_BROWSER_REVISION = "adf912be85ff9221ee171551778456b133c1af75"
 
-    def __init__(self, model: str = "browser", subfolder: str | None = None, **kwargs: Any) -> None:
+    def __init__(self, model: str = "browser", subfolder: str | None = None,
+                 revision: str | None = None, **kwargs: Any) -> None:
         try:
             import laya_mlx  # noqa: F401
         except ImportError as exc:  # pragma: no cover - exercised only without the extra
@@ -66,11 +70,15 @@ class LayaMLXBackend:
                 "laya-mlx is not installed. On Apple Silicon: pip install laya-mlx",
             ) from exc
         self._laya = importlib.import_module("laya_mlx")
-        self._kwargs = kwargs
+        self._kwargs = dict(kwargs)
         if model == "browser":
             model, subfolder = self.BROWSER_MODEL, subfolder or self.BROWSER_SUBFOLDER
         elif model == "browser-legacy":
             model, subfolder = self.LEGACY_BROWSER_MODEL, subfolder or self.LEGACY_BROWSER_SUBFOLDER
+            if revision is None:
+                revision = self.LEGACY_BROWSER_REVISION
+        if revision is not None:
+            self._kwargs["revision"] = revision
         self._model_arg: Any = model
         self._subfolder: Optional[str] = subfolder
         self._agent = None
@@ -104,7 +112,8 @@ class LayaTorchBackend:
 
     name = "laya-torch"
 
-    def __init__(self, model: str = "browser", subfolder: str | None = None, **kwargs: Any) -> None:
+    def __init__(self, model: str = "browser", subfolder: str | None = None,
+                 revision: str | None = None, **kwargs: Any) -> None:
         try:
             import laya  # noqa: F401
         except ImportError as exc:  # pragma: no cover
@@ -113,11 +122,17 @@ class LayaTorchBackend:
                 "laya is not installed. pip install laya (pulls torch and transformers)",
             ) from exc
         self._laya = importlib.import_module("laya")
-        self._kwargs = kwargs
+        self._kwargs = dict(kwargs)
+        if revision is not None:
+            self._kwargs["revision"] = revision
         if model == "browser":
             model, subfolder = LayaMLXBackend.BROWSER_MODEL, subfolder or LayaMLXBackend.BROWSER_SUBFOLDER
         elif model == "browser-legacy":
             model, subfolder = LayaMLXBackend.LEGACY_BROWSER_MODEL, subfolder or LayaMLXBackend.LEGACY_BROWSER_SUBFOLDER
+            if revision is None:
+                revision = LayaMLXBackend.LEGACY_BROWSER_REVISION
+        if revision is not None:
+            self._kwargs["revision"] = revision
         self._model_arg: Any = model
         self._subfolder: Optional[str] = subfolder
         self._agent = None
@@ -157,7 +172,7 @@ class HTTPBackend:
         self.model = model
         self.timeout = timeout
 
-    def answer(self, state: State, questions: Questions) -> Dict[str, Any]:
+    def answer(self, state: State, questions: Questions, *, timeout: Optional[float] = None) -> Dict[str, Any]:
         import json
         import urllib.error
         import urllib.request
@@ -168,13 +183,18 @@ class HTTPBackend:
             headers["Authorization"] = f"Bearer {self.api_key}"
         request = urllib.request.Request(self.url, data=body, headers=headers, method="POST")
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout) as response:
+            with urllib.request.urlopen(request, timeout=self.timeout if timeout is None else max(0.001, timeout)) as response:
                 payload = json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as error:
-            raise BackendError(f"http_{error.code}", error.read().decode("utf-8", "ignore")[:200]) from None
+            try:
+                detail = error.read().decode("utf-8", "ignore")[:200]
+            finally:
+                error.close()
+            raise BackendError(f"http_{error.code}", detail) from None
         except Exception as error:  # network, timeout, malformed
             raise BackendError("network", str(error)[:200]) from None
-        if not isinstance(payload, dict) or not isinstance(payload.get("answers"), dict):
+        if (not isinstance(payload, dict) or not isinstance(payload.get("answers"), dict)
+                or ("usage" in payload and not isinstance(payload["usage"], dict))):
             raise BackendError("malformed", "reply has no answers")
         payload.setdefault("backend", self.name)
         return payload

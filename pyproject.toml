@@ -41,10 +41,14 @@ localdecide = "localdecide.cli:main"
 localdecide-mcp = "localdecide.mcp_server:serve"
 
 [tool.setuptools]
-packages = ["localdecide", "localdecide.backends"]
+packages = ["localdecide", "localdecide.backends", "tests"]
+
+[tool.setuptools.data-files]
+"scripts" = ["scripts/run_live_batched.sh"]
 
 [tool.setuptools.package-data]
 localdecide = ["py.typed"]
+tests = ["*.py", "fixtures/*.html"]
 
 [tool.ruff]
 line-length = 120

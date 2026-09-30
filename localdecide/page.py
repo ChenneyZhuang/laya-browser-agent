@@ -65,6 +65,7 @@ class Element:
     selected: Optional[bool] = None
     expanded: Optional[bool] = None
     disabled: bool = False
+    sensitive: bool = False
     options: List[Dict[str, str]] = field(default_factory=list)
     operations: List[str] = field(default_factory=list)
     # Your own handle back to the real node - a CDP backendNodeId, a Playwright locator
@@ -82,8 +83,10 @@ class Element:
         text = f"[{self.index}] {self.label[:max_label]}"
         if self.role:
             text += f" ({self.role})"
-        if self.value:
+        if self.value and not self.sensitive:
             text += f" = {self.value[:30]!r}"
+        if self.sensitive:
+            text += " sensitive-password"
         for name in ("checked", "selected", "expanded"):
             flag = getattr(self, name)
             if flag is not None:
@@ -95,8 +98,10 @@ class Element:
     def to_dict(self) -> Dict[str, Any]:
         """Wire form: what actually goes into the request."""
         data: Dict[str, Any] = {"index": self.index, "label": self.label}
-        for name in ("role", "value", "checked", "selected", "expanded", "disabled"):
+        for name in ("role", "value", "checked", "selected", "expanded", "disabled", "sensitive"):
             value = getattr(self, name)
+            if name == "value" and self.sensitive:
+                continue
             if value not in (None, "", False):
                 data[name] = value
         if self.options:
@@ -161,15 +166,21 @@ class ElementTable:
     def from_dict(cls, data: Mapping[str, Any]) -> "ElementTable":
         elements = []
         for raw in data.get("elements", []) or []:
+            role = str(raw.get("role", "") or "")
+            sensitive = bool(raw.get("sensitive", False)) or role.lower() == "password"
+            raw_label = str(raw.get("label", "") or "")
+            raw_value = str(raw.get("value", "") or "")
             elements.append(Element(
                 index=str(raw.get("index", "")),
-                label=str(raw.get("label", "")),
-                role=str(raw.get("role", "") or ""),
-                value=str(raw.get("value", "") or ""),
+                label=(raw_label if raw_label and raw_label not in {raw_value, str(raw.get("current_value", "") or "")} else
+                       ("Password field" if sensitive else "")),
+                role=role,
+                value="" if sensitive else str(raw.get("value", "") or ""),
                 checked=raw.get("checked"),
                 selected=raw.get("selected"),
                 expanded=raw.get("expanded"),
                 disabled=bool(raw.get("disabled", False)),
+                sensitive=sensitive,
                 options=list(raw.get("options") or []),
                 operations=list(raw.get("operations") or []),
                 handle=raw.get("handle"),
@@ -208,7 +219,7 @@ def build_element_table(observation: Mapping[str, Any], *, include: Optional[Seq
     seen: Dict[Any, str] = {}
 
     raw_items: Iterable[Mapping[str, Any]]
-    if observation.get("actions") is not None:
+    if observation.get("actions"):
         raw_items = observation["actions"]
     else:
         raw_items = observation.get("elements", []) or []
@@ -231,6 +242,13 @@ def build_element_table(observation: Mapping[str, Any], *, include: Optional[Seq
 
         node = raw.get("node", raw.get("handle", raw.get("id")))
         label = str(raw.get("label", raw.get("name", raw.get("text", ""))) or "").strip()
+        role = str(raw.get("role", "") or "")
+        sensitive = bool(raw.get("sensitive", False)) or str(raw.get("type", "") or "").lower() == "password" \
+            or role.lower() == "password"
+        if sensitive and label in {str(raw.get("value", "") or ""), str(raw.get("current_value", "") or "")}:
+            label = "Password field"
+        if sensitive and not label:
+            label = "Password field"
         if not label:
             continue
         key = node if node is not None else label
@@ -243,14 +261,15 @@ def build_element_table(observation: Mapping[str, Any], *, include: Optional[Seq
             element = Element(
                 index=index,
                 label=label,
-                role=str(raw.get("role", "") or ""),
-                value=str(raw.get("current_value", raw.get("value", "")) or ""),
+                role=role,
+                value="" if sensitive else str(raw.get("current_value", raw.get("value", "")) or ""),
                 checked=raw.get("checked"),
                 selected=raw.get("selected"),
                 expanded=raw.get("expanded"),
                 disabled=bool(raw.get("disabled", False)),
+                sensitive=sensitive,
                 handle=node,
-                meta={k: raw[k] for k in ("bbox", "frame", "selector", "aria") if k in raw},
+                meta={k: raw[k] for k in ("bbox", "frame", "selector", "aria", "identity") if k in raw},
             )
             elements.append(element)
         if operation not in element.operations:

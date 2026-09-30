@@ -9,6 +9,18 @@ set -euo pipefail
 # Repo root = wherever this script lives (works on any machine, not just the author's Mac).
 cd "$(dirname "$0")/.." || exit 1
 
+if [ -n "${PYTHON:-}" ]; then
+  PYTHON_BIN="$PYTHON"
+elif [ -x ".venv/bin/python" ]; then
+  PYTHON_BIN=".venv/bin/python"
+else
+  PYTHON_BIN="$(command -v python3 || command -v python || true)"
+fi
+if [ -z "$PYTHON_BIN" ]; then
+  echo "No Python interpreter found; set PYTHON or put python3 on PATH" >&2
+  exit 127
+fi
+
 BATCHES=(
   "TestObservationReader"
   "TestDecisionsOnRealElements"
@@ -34,7 +46,7 @@ for batch in "${BATCHES[@]}"; do
     exit 2
   fi
   echo "=== $batch (memory free: ${free}%, swap: $(swap_used_mb)MB) ==="
-  .venv/bin/python -m pytest "tests/test_live.py::$batch" -q --tb=line -p no:cacheprovider 2>&1 | tail -18
+  "$PYTHON_BIN" -m pytest "tests/test_live.py::$batch" -q --tb=line -p no:cacheprovider 2>&1 | tail -18
   # Let the batch's processes and memory settle before the next one.
   sleep 4
 done

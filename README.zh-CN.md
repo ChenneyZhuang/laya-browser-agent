@@ -4,7 +4,9 @@
 
 > 本页面是 laya-browser-agent 的中文说明。英文原版（最新）见 [README.md](README.md)。
 
-**浏览器 agent 决策，由 Laya 驱动 —— 开源的 System 1 模型。TypeSafe Jev 的本地开源替代：无云端、无 API key、无截图。**
+**面向 Jev 类模型的多后端、受约束决策支持框架。** 支持 Laya MLX/PyTorch、任意
+`answer(state, questions)` 同步 duck backend，以及任意 System One 形状的 HTTP
+endpoint；浏览器默认推荐本项目自己的 checkpoint，并非强制使用专有模型。
 
 [![tests](https://github.com/ChenneyZhuang/laya-browser-agent/actions/workflows/tests.yml/badge.svg)](https://github.com/ChenneyZhuang/laya-browser-agent/actions/workflows/tests.yml/badge.svg)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
@@ -14,13 +16,14 @@
 
 本项目把这类模型接进这个角色——**完全在本地运行**，适配你已有的任何 agent。
 
-> **🚀 自训 checkpoint 已设为默认模型：8 项基准 6 项超越官方。** `model="browser"`
-> 现在直接加载本项目训练的
+`model="browser"` 默认加载本项目训练的
 > **[ichenney/laya-browser-v32b](https://huggingface.co/ichenney/laya-browser-v32b)**——
-> holdout **0.7125 vs 官方 0.425**、MiniWoB **0.9138 vs 0.6638**、JevBench hard
-> **0.4144 vs 0.243**，6/8 项基准领先官方浏览器微调版；3080 上单步决策 **27 ms**，
-> 比 Jev 云端 API 快 31 倍。零代码改动，HF Hub 自动下载，之后完全离线。
-> 想继续用官方 checkpoint：`model="browser-legacy"`。
+> 子目录为 `v32b`；`model="browser-legacy"` 选择 upstream `cklxx/laya-browser`
+> 的 `v10s` 路径。由于 upstream `main` 已移除这个历史目录，legacy 别名默认固定到
+> revision `adf912be85ff9221ee171551778456b133c1af75`；也可以显式传入 `revision=` 覆盖。
+> 已提交的历史诊断中，九项指标胜 5 负 4；对应八项正确性视图胜 5 负 3。
+> 这不是新推理声明。已发布 checkpoint 还有 95-case deployment 反证，v37 尚未通过 runtime
+> acceptance，本项目不声称 v37 可用。
 > [完整对比数据 →](#实测数据)
 
 ## 安装
@@ -45,6 +48,40 @@ localdecide doctor
 ```
 
 默认 v32b 模型首次使用时下载一次（约 1.3 GB；`browser-legacy` 官方 v10s 版约 650 MB），之后全部离线。
+
+配置参数已公开：`model`、`subfolder`、`revision` 会传给已核对的 upstream runtime；HTTP
+backend 还接受 `model`、`api_key`、`timeout`。自定义同步 backend 只需实现
+`answer(state, questions)` 并返回 `{"answers": {...}, "usage": {...}}`。`Decider` 的
+总 timeout 会约束 HTTP 剩余 timeout；同步 duck 调用不能被 Python 强制中断，晚到结果会拒绝且不再重试。
+
+### 后端配置、超时与安全边界
+
+下面的例子使用实际的 v32b 模型名，也展示 API key、HTTP timeout 和自定义 backend：
+
+```python
+from localdecide import Decider
+from localdecide.backends.base import HTTPBackend, LayaTorchBackend
+
+local = LayaTorchBackend(model="ichenney/laya-browser-v32b", subfolder="v32b")
+
+class MyBackend:
+    name = "my-local-backend"
+    def answer(self, state, questions):
+        return {"answers": {}, "usage": {}}
+
+remote = HTTPBackend(
+    "http://127.0.0.1:8791/v1/systemone",
+    model="browser", api_key="example-key", timeout=10.0,
+)
+decider = Decider(backend=remote, timeout=12.0, retries=1)
+```
+
+本地 MLX/PyTorch backend 不会把页面状态发出本机；HTTP backend 会把状态和问题
+发送到你配置的 endpoint，只应连接可信的本地或私有服务。`api_key` 会作为 Bearer
+header 发送，真实 key 请放在 `LOCALDECIDE_API_KEY` 或 secret manager 中，不要写进
+源码或 shell history。密码值会在观察中脱敏，`TYPE_TEXT` 会拒绝密码字段（项目不提供
+vault 访问）；发送、删除、支付等不可逆动作请提供人工 `confirm` 回调。同步自定义
+backend 不能被 Python 强制中断，超时后到达的结果会拒绝且不会再次调用。
 
 ## 实测数据（M4, 16 GB）
 
@@ -73,8 +110,8 @@ localdecide doctor
 | JevBench easy | 0.8542 | 0.979 | 1.0000 |
 | 决策延迟（p50） | **27 ms**（RTX 3080） | — | 854 ms（网络往返） |
 
-**怎么读这张表**：本地赛道（不花钱、不上云）里，v32b 在 8 项基准中 6 项领先官方浏览器
-微调 checkpoint——holdout 大幅领先 28.8 个百分点，MiniWoB 领先 25 个百分点。与 Jev 云端
+**怎么读这张表**：已提交诊断支持的历史结果合计为九项指标胜 5 负 4；对应八项正确性视图胜
+5 负 3。与 Jev 云端
 API 相比，绝对精度仍有差距（Jev 是云端大模型），但 v32b **免费、隐私（页面内容不出本机）、
 可离线、快 31 倍**，且在 `score` 评分题（0.667 vs 0.333）和 `temporal_numeric`（0.33 vs
 0.20）两类题上反超 Jev。
@@ -98,7 +135,7 @@ with PlaywrightDriver(start_url="https://en.wikipedia.org/wiki/Main_Page") as dr
 
 ### 与官方 Jev 的正面对决：实测数据
 
-以下对战在 v32b 诞生前完成，本地侧用的是当时的官方 v10s checkpoint（历史记录保留；v32b 在 6/8 项基准上已超越 v10s，见上表）。`examples/diagnostics/jev_head_to_head.py`（单步）与 `jev_flow_h2h.py`（多步完整流程）把同样的任务分别喂给本地 Laya v10s 与官方 jev-1.13.0：
+以下对战在 v32b 诞生前完成，本地侧用的是当时的官方 v10s checkpoint，作为历史记录保留，不能当作新模型推理。`examples/diagnostics/jev_head_to_head.py`（单步）与 `jev_flow_h2h.py`（多步完整流程）把同样的任务分别喂给本地 Laya v10s 与官方 jev-1.13.0：
 
 | 单步零上下文（12 题 / 6 语言） | 本地 v10s | 官方 Jev |
 |---|---|---|
@@ -121,16 +158,15 @@ with PlaywrightDriver(start_url="https://en.wikipedia.org/wiki/Main_Page") as dr
 
 | 任务 | 本地 v10s | 官方 Jev |
 |---|---|---|
-| 泳池线索 `relevant` 判断 | 3/7 正确 | **7/7** |
+| 泳池线索 `relevant`（10 例） | **6/10** | **10/10** |
 | 泳池线索质量分（0-4）| 偏低（1.0-2.0）| **校准良好（2.4-3.7）** |
-| 中文短信：交易识别/类型 | **6/8** | 6/8 |
-| 中文短信：**钓鱼诈骗识别** | **0/3** | **3/3** |
+| 中文短信：交易/类型/钓鱼联合（8 例） | **5/8** | **5/8** |
 | 鲁棒性（空文本/5k长文/干扰措辞）| 3/3 | 3/3 |
 | 中位延迟 | **36ms** | 738ms |
 
 钓鱼识别值得警惕：「妈妈，我手机坏了…快转5000」这类经典骗局本地只给 p=0.14，红包诈骗 p=0.23——两个都会放行；官方 Jev 都是 p=0.96。**任何涉安全路由（诈骗/滥用）场景，当前本地模型不能单独信任。**
 
-**浏览器边缘场景**（`jev_edge_h2h.py`，9 例，正确答案往往是"不动"）：本地 4/9、官方 5/9，且失败方向相反——本地是"先点了再说"型：让删掉整个网站它就真去点「Delete my account」（p=0.93）、对已勾选/禁用元素照样出手，且置信度全都在 0.9 上下；官方会拦不可能目标但也会误伤正常目标。两个引擎目前都没有可靠的"这个目标做不到"概念，今天的兜底是 harness 自己的守卫（禁用元素检查、确认门）。
+**浏览器边缘场景**（`jev_edge_h2h.py`，9 例）：旧的 4/9 对 5/9 只统计 operation；现在 scorer 分开报告 operation、target、joint。gold 已修正为 fixture 中确实未勾选的 newsletter 控件；旧的 checked-fixture 行不能当作新模型结果。安全边界仍是 harness 的禁用检查与确认门。
 
 四组测试的实用结论：准确率与安全校准优先→官方 Jev；延迟（快 10-20 倍）、隐私、免费大量调用→本地版 + harness 守卫补偿。中文 grounding/钓鱼识别/克制能力正是微调该打的方向。
 ## 与 Jev / Laya 的关系
@@ -141,7 +177,7 @@ with PlaywrightDriver(start_url="https://en.wikipedia.org/wiki/Main_Page") as dr
 | 运行位置 | TypeSafe 云端 | 任何 PyTorch 环境 | **你的机器**（MLX / PyTorch）|
 | 接口格式 | `POST /v1/systemone` | 同一契约 | 同样支持 |
 | 费用 | $0.042/百万输入 token | 免费 | 免费 |
-| 浏览器工具链 | [jev-ultrafast](https://github.com/browser-use/jev-ultrafast)（12.6k★）| — | **内置**：循环、驱动、安全护栏、技能 |
+| 浏览器工具链 | [jev-ultrafast](https://github.com/browser-use/jev-ultrafast) | — | **内置**：循环、驱动、安全护栏、技能 |
 | 页面内容离开本机 | 是 | 否 | **否** |
 
 如果你看过 Jev 的 "System One" 模型报道，想要同样的理念——结构化、带校准概率的决策而非生成文本——在你自己的浏览器 agent 上本地运行，这就是你要的接线方式。
@@ -166,7 +202,7 @@ with PlaywrightDriver(start_url="https://en.wikipedia.org/wiki/Main_Page") as dr
 
 ### 文献支撑
 
-- [arXiv 2609.23959](https://arxiv.org/abs/2609.23959)（2026-09）：独立同行证据——同款"类型化决策"读出用在诈骗筛查上，数据到位时 AUROC .974、校准误差 .052、单次决策 64.5ms（消费级 GPU）。说明本 README 文本测试里的钓鱼短板是训练数据问题，不是架构天花板。
+- [arXiv 2609.23959](https://arxiv.org/abs/2609.23959)（2026-09）：相关 typed-decision 诈骗筛查任务报告 AUROC .974、校准误差 .052；这是背景证据，不是本项目短信结果的因果解释。
 - Laya 上游公开的校准基准：13 个任务族 **accuracy 0.753 @ ECE 0.030**（温度校准后）——v10s 浏览器 checkpoint 在浏览器分布之外的文本上没有继承这个校准水平（见上文泳池/短信测试）。
 
 ## 已知局限

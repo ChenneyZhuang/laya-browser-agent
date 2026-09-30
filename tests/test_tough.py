@@ -9,7 +9,18 @@ from __future__ import annotations
 
 import unittest
 
-from test_live import FIXTURES, observe_fixture
+import pytest
+
+from . import test_live
+
+FIXTURES = test_live.FIXTURES
+pytestmark = pytest.mark.skipif(not test_live.LIVE, reason="needs a local model runtime and playwright")
+
+if test_live.LIVE:
+    observe_fixture = test_live.observe_fixture
+else:
+    def observe_fixture(*args, **kwargs):
+        pytest.skip("needs a local model runtime and playwright")
 
 from localdecide import build_element_table, table_to_questions
 
@@ -53,7 +64,7 @@ class TestHiddenMenus(unittest.TestCase):
 
     def test_two_step_open_then_click_reaches_the_hidden_item(self):
         """Step 1 clicks the toggle; step 2 can then see the items. Via the real loop."""
-        from test_live import _run_child
+        from .test_live import _run_child
         result = _run_child("run", {
             "goal": "Open the menu, then click 'Menu item one'.",
             "url": f"file://{FIXTURES / 'tough_pages.html'}",
