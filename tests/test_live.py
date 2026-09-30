@@ -4,13 +4,15 @@ These are the "does it actually work" tests, as distinct from `test_contract.py`
 verifies the harness rules with a fake backend. They need:
 
     git clone https://github.com/ChenneyZhuang/laya-browser-agent && cd laya-browser-agent
-    pip install -e '.[all]' && playwright install chromium
+    pip install -e '.[mlx,playwright,cdp]' && playwright install chromium
 
 and they download the browser checkpoint on first run. Run them with:
 
-    .venv/bin/python -m pytest tests/test_live.py -v -s
+    LOCALDECIDE_RUN_LIVE=1 .venv/bin/python -m pytest tests/test_live.py -v -s
 
-They are separate because they are slow (seconds, not milliseconds) and require a model.
+Ordinary pytest collection leaves these model-backed classes skipped. The explicit
+`LOCALDECIDE_RUN_LIVE=1` opt-in is required; `LOCALDECIDE_SKIP_LIVE=1` still wins.
+They are separate because they are slow and require a model.
 Everything they assert is also asserted structurally in the fast suite, so CI can run
 just the contract tests.
 """
@@ -19,13 +21,23 @@ from __future__ import annotations
 
 import os
 import pathlib
+import json
+import subprocess
+import sys
+import tempfile
+import threading
 import unittest
+from unittest.mock import patch
+
+from localdecide import BrowserDecider
 
 FIXTURES = pathlib.Path(__file__).parent / "fixtures"
 
 
 def _require_live() -> bool:
     if os.environ.get("LOCALDECIDE_SKIP_LIVE"):
+        return False
+    if os.environ.get("LOCALDECIDE_RUN_LIVE") != "1":
         return False
     try:
         import importlib.util
@@ -36,6 +48,97 @@ def _require_live() -> bool:
 
 
 LIVE = _require_live()
+
+
+def _last_json(stdout: str, stderr: str, code: int) -> dict:
+    for line in reversed((stdout or "").strip().splitlines()):
+        if line.startswith("{"):
+            return json.loads(line)
+    raise AssertionError(f"browser child failed ({code}):\n{(stderr or stdout or '')[-1200:]}")
+
+
+def _terminate_and_reap(process: subprocess.Popen) -> None:
+    """Make the child lifecycle finite even when the child stops producing output."""
+    if process.poll() is None:
+        process.kill()
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=5)
+
+
+def _serve_decisions(process: subprocess.Popen) -> dict:
+    """Answer the child decision requests on its stdout/stdin pipe."""
+    assert process.stdout is not None and process.stdin is not None
+    result: dict | None = None
+    for line in process.stdout:
+        line = line.strip()
+        if not line.startswith("{"):
+            continue
+        message = json.loads(line)
+        if message.get("want") == "decide":
+            decision = decider().decide(message["state"], message["questions"])
+            if decision.ok and decision.answers is not None:
+                reply = {"ok": True, "answers": decision.answers.raw,
+                         "latency_ms": decision.latency_ms, "backend": decision.answers.backend}
+            else:
+                reply = {"ok": False, "error": decision.error}
+            process.stdin.write(json.dumps(reply, ensure_ascii=False, default=str) + "\n")
+            process.stdin.flush()
+        else:
+            result = message
+    process.wait()
+    if result is None:
+        stderr = process.stderr.read() if process.stderr else ""
+        raise AssertionError(f"child produced no result. stderr:\n{stderr[-1200:]}")
+    return result
+
+
+def _run_child(action: str, request: dict, *, timeout: float = 240, script: pathlib.Path | None = None) -> dict:
+    """Run a browser child with a bounded lifetime and a reaped process."""
+    if action not in {"observe", "run"}:
+        raise ValueError(f"unsupported child action: {action}")
+    env = dict(os.environ)
+    env["PYTHONUNBUFFERED"] = "1"
+    child_script = script or pathlib.Path(__file__).parent / "_browser_child.py"
+    process = subprocess.Popen(
+        [sys.executable, str(child_script), action, json.dumps(request)],
+        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        text=True, bufsize=1, env=env,
+    )
+    worker: threading.Thread | None = None
+    try:
+        if action == "run":
+            outcome: dict[str, dict] = {}
+            failure: list[BaseException] = []
+
+            def serve() -> None:
+                try:
+                    outcome["result"] = _serve_decisions(process)
+                except BaseException as error:  # surfaced in the calling test process
+                    failure.append(error)
+
+            worker = threading.Thread(target=serve, name="localdecide-child", daemon=True)
+            worker.start()
+            worker.join(timeout)
+            if worker.is_alive():
+                raise TimeoutError(f"browser child exceeded {timeout:g}s")
+            if failure:
+                raise failure[0]
+            return outcome["result"]
+        try:
+            stdout, stderr = process.communicate(timeout=timeout)
+        except subprocess.TimeoutExpired as error:
+            raise TimeoutError(f"browser child exceeded {timeout:g}s") from error
+        return _last_json(stdout, stderr, process.returncode)
+    finally:
+        _terminate_and_reap(process)
+        if worker is not None and worker.is_alive():
+            worker.join(timeout=1)
+        for stream in (process.stdin, process.stdout, process.stderr):
+            if stream is not None:
+                stream.close()
 
 if LIVE:
     from localdecide import Decider, Scope, build_element_table, table_to_questions
@@ -72,69 +175,57 @@ if LIVE:
             observation["scope"]["goal_protected"] = observation["scope"].get("goal_protected", 0)
         return observation
 
-    def _run_child(action: str, request: dict) -> dict:
-        """Run one browser interaction in a fresh subprocess and return its result.
+class TestSubprocessLifecycle(unittest.TestCase):
+    def test_default_gate_refuses_even_when_runtime_discovery_succeeds(self):
+        with patch.dict(os.environ, {"LOCALDECIDE_RUN_LIVE": "", "LOCALDECIDE_SKIP_LIVE": ""}, clear=False):
+            with patch("importlib.util.find_spec", return_value=object()) as find_spec:
+                self.assertFalse(_require_live())
+                find_spec.assert_not_called()
 
-        For `run` actions the child needs decisions, which live in this process. Rather
-        than loading a second copy of the checkpoint (that is what filled the machine's
-        memory), the child asks over a pipe and this loop answers.
-        """
-        import json
-        import os
-        import subprocess
-        import sys
+    def test_opt_in_gate_checks_presence_without_loading_a_runtime(self):
+        with patch.dict(os.environ, {"LOCALDECIDE_RUN_LIVE": "1", "LOCALDECIDE_SKIP_LIVE": ""}, clear=False):
+            with patch("importlib.util.find_spec", side_effect=(None, object(), object())) as find_spec:
+                with patch.dict(sys.modules, {"laya_mlx": None, "laya": None, "playwright": None}):
+                    self.assertTrue(_require_live())
+                self.assertEqual([call.args[0] for call in find_spec.call_args_list],
+                                 ["laya_mlx", "laya", "playwright"])
 
+    def test_skip_gate_is_applied_during_module_import(self):
         env = dict(os.environ)
-        env["PYTHONUNBUFFERED"] = "1"
-        script = pathlib.Path(__file__).parent / "_browser_child.py"
-        process = subprocess.Popen(
-            [sys.executable, str(script), action, json.dumps(request)],
-            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            text=True, bufsize=1, env=env,
+        env["LOCALDECIDE_SKIP_LIVE"] = "1"
+        result = subprocess.run(
+            [sys.executable, "-c",
+             "import tests.test_live as m; assert not m.LIVE; "
+             "assert m.TestObservationReader.__unittest_skip__"],
+            cwd=pathlib.Path(__file__).parents[1], env=env,
+            capture_output=True, text=True,
         )
-        try:
-            if action == "run":
-                # Serve decisions until the child prints its result or closes.
-                return _serve_decisions(process, json)
-            stdout, stderr = process.communicate(timeout=240)
-            return _last_json(stdout, stderr, process.returncode)
-        finally:
-            if process.poll() is None:
-                process.kill()
+        self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
 
-    def _serve_decisions(process, json) -> dict:
-        """Answer the child's decision requests on its stdout/stdin pipe."""
-        assert process.stdout is not None and process.stdin is not None
-        result: dict | None = None
-        for line in process.stdout:
-            line = line.strip()
-            if not line.startswith("{"):
-                continue
-            message = json.loads(line)
-            if message.get("want") == "decide":
-                decision = decider().decide(message["state"], message["questions"])
-                if decision.ok and decision.answers is not None:
-                    reply = {"ok": True, "answers": decision.answers.raw,
-                             "latency_ms": decision.latency_ms, "backend": decision.answers.backend}
-                else:
-                    reply = {"ok": False, "error": decision.error}
-                process.stdin.write(json.dumps(reply, ensure_ascii=False, default=str) + "\n")
-                process.stdin.flush()
-            else:
-                result = message
-        process.wait(timeout=60)
-        if result is None:
-            stderr = process.stderr.read() if process.stderr else ""
-            raise AssertionError(f"child produced no result. stderr:\n{stderr[-1200:]}")
-        return result
+    def _assert_hung_child_is_reaped(self, action: str):
+        with tempfile.TemporaryDirectory() as temp:
+            child = pathlib.Path(temp) / "hung_child.py"
+            child.write_text("import time\ntime.sleep(60)\n", encoding="utf-8")
+            seen: list[subprocess.Popen] = []
+            real_popen = subprocess.Popen
 
-    @staticmethod
-    def _last_json(stdout: str, stderr: str, code: int) -> dict:
-        import json
-        for line in reversed((stdout or "").strip().splitlines()):
-            if line.startswith("{"):
-                return json.loads(line)
-        raise AssertionError(f"browser child failed ({code}):\n{(stderr or stdout or '')[-1200:]}")
+            def record(*args, **kwargs):
+                process = real_popen(*args, **kwargs)
+                seen.append(process)
+                return process
+
+            with patch.object(subprocess, "Popen", side_effect=record):
+                with self.assertRaises(TimeoutError):
+                    _run_child(action, {}, timeout=0.2, script=child)
+            self.assertEqual(len(seen), 1)
+            self.assertIsNotNone(seen[0].poll(), "timeout cleanup must reap the child")
+            self.assertNotEqual(seen[0].returncode, 0, "the deliberately hung child must be killed")
+
+    def test_hung_observe_child_is_killed_and_reaped(self):
+        self._assert_hung_child_is_reaped("observe")
+
+    def test_hung_run_child_is_killed_and_reaped(self):
+        self._assert_hung_child_is_reaped("run")
 
 
 @unittest.skipUnless(LIVE, "needs a local model runtime and playwright")
@@ -480,30 +571,32 @@ class TestFlows(unittest.TestCase):
 
 
 class TestMemorySafety(unittest.TestCase):
-    """Guards against the failure mode that rebooted the development machine.
+    """Behavioral lifecycle checks that do not load a model or start a browser."""
 
-    The crash was a kernel watchdog panic (`no checkins from watchdogd in 92 seconds`)
-    while a model checkpoint and a Chromium were both resident in one interpreter on a
-    16 GB box. These tests are cheap and always run - they encode the operational rules
-    so the same mistake is not repeated.
-    """
+    def test_browser_decider_is_lazy_until_a_real_decision(self):
+        """Constructing the loop must not allocate a checkpoint or runtime."""
+        from unittest.mock import patch
 
-    def test_suite_frees_the_model_between_test_modules(self):
-        """The live suite must not keep a checkpoint alive while browsers run."""
-        source = (pathlib.Path(__file__).parent / "test_live.py").read_text(encoding="utf-8")
-        self.assertIn("_browser_child", source,
-                      "browser work must go through the subprocess helper, not run in-process")
+        with patch("localdecide.loop.Decider", side_effect=AssertionError("model created early")):
+            browser = BrowserDecider()
+        self.assertIsNone(browser._decider)
 
-    def test_browser_helpers_have_a_timeout(self):
-        source = (pathlib.Path(__file__).parent / "test_live.py").read_text(encoding="utf-8")
-        self.assertIn("timeout=", source,
-                      "every subprocess browser call needs a timeout so a hang cannot wedge the machine")
+    def test_browser_decider_closes_driver_after_an_observation_exception(self):
+        """The cleanup boundary is behavioral even when observation itself fails."""
+        class ExplodingDriver:
+            def __init__(self):
+                self.closed = 0
 
-    def test_running_live_tests_is_optout_not_optin(self):
-        """The live suite is skipped by default so a normal test run cannot melt the box."""
-        source = (pathlib.Path(__file__).parent / "test_live.py").read_text(encoding="utf-8")
-        self.assertIn("LOCALDECIDE_SKIP_LIVE", source,
-                      "the live suite must have an explicit escape hatch")
+            def observe(self):
+                raise RuntimeError("synthetic observation failure")
+
+            def close(self):
+                self.closed += 1
+
+        driver = ExplodingDriver()
+        with self.assertRaisesRegex(RuntimeError, "synthetic observation failure"):
+            BrowserDecider(decider=object()).run(driver, "inspect page")
+        self.assertEqual(driver.closed, 1)
 
 
 if __name__ == "__main__":

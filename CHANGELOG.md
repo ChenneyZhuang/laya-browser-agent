@@ -29,6 +29,42 @@ Format based on [Keep a Changelog](https://keepachangelog.com/); versioning foll
 - README install commands in all four languages now match the current Git-clone/editable-install workflow; PyPI availability was checked and the package is not published yet.
 - The body-size test now sends an oversized `Content-Length` and asserts the exact 413 response instead of sending a small body and accepting either 413 or 422.
 - Removed an identical duplicate `open_kickoff` goal entry in the v37 generator; bound loop data explicitly in its probes.
+- Browser observation handles are now document-local, so a handle from one document cannot
+  be reused against a replacement document with a reset counter. SELECT observations omit
+  disabled options, and both drivers reject disabled option values (including disabled
+  `optgroup` entries) while resolving the actual option value.
+- CDP CLICK revalidates the stable target and its current geometry after `mousePressed` and
+  before `mouseReleased`; a failed recheck releases at `(-1, -1)` and fails closed. Tests
+  cover replacement and movement. This is fail-closed cleanup, not a claim that CDP makes
+  the press/release race transactional. SELECT now verifies the final DOM value after the
+  change handler, with a regression for a handler that reverts it. Playwright's constructor
+  records an existing event loop without the deprecated idle-loop lookup; behavioral tests
+  also cover no-warning construction, idempotent close, lazy model construction, driver
+  cleanup, and late synchronous timeout rejection.
+- Live subprocess helpers now enforce a bounded timeout and kill/reap hung fake children;
+  model-free tests prove both `observe` and piped `run` cleanup paths, while the real live
+  suite remains guarded by its explicit runtime/browser skip gate.
+- Live model tests now require explicit `LOCALDECIDE_RUN_LIVE=1` opt-in, with the skip
+  variable taking precedence; the batch launcher sets it and rejects installed standalone
+  layouts that lack the source checkout's tests. Model-free development commands no longer
+  install model extras or invoke the model-loading doctor smoke test.
+- The v32b Hub metadata is now recorded at immutable revision
+  `161d54d6000913ff279b0afd1ac77faef8685a9b`. Independent published-source checks confirm
+  `laya` 0.3.20 lacks `revision`, 0.3.21 forwards it, and `laya-mlx` 0.1.0 supports it;
+  README compatibility examples and the configured minimums are aligned.
+- The Playwright event-loop compatibility path handles only the Python 3.14 legacy policy
+  getter warning while retaining idle-loop restoration; CDP press/release and synchronous
+  duck-backend cancellation remain bounded/fail-closed but not transactional.
+- The wheel is runtime-only and no longer installs the `tests` namespace; the sdist keeps
+  tests, fixtures, subprocess helpers, scripts, and release docs. CI inspects and installs
+  both archive types in isolated environments.
+- README model claims now distinguish the official Laya base from the browser fine-tunes,
+  qualify local-only privacy/cost language versus HTTP, remove stale prices and test counts,
+  remove unsupported timing/model-size promises, and link the source-backed
+  model-compatibility and release-verification boundaries. The four README compatibility
+  examples now use the verified v32b revision. The
+  historical operation-only edge result is not presented as target/joint correctness, and
+  MiniWoB/fixture accuracy is explicitly not task success.
 
 ### Changed
 - CI now runs the model-free Jev-wire and CLI install-guidance tests, and pins Ruff to the version already observed on GitHub Actions (`0.16.9`).

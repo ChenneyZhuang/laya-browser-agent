@@ -19,7 +19,9 @@ screenshot is only ever for *your* logs, not for the loop.
 
 from __future__ import annotations
 
+import asyncio
 import json
+import warnings
 from typing import Any, Dict, List, Optional
 
 from .loop import ElementRef
@@ -93,8 +95,15 @@ OBSERVE_JS = r"""
     const label = labelOf(el) || (sensitive ? 'Password field' : '');
     if (!label) return;
     if (!el.__localdecide_handle) {
+      if (!window.__localdecide_document_id) {
+        const random = window.crypto && typeof window.crypto.randomUUID === 'function'
+          ? window.crypto.randomUUID()
+          : Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+        window.__localdecide_document_id = random;
+      }
       window.__localdecide_next_handle = (window.__localdecide_next_handle || 0) + 1;
-      el.__localdecide_handle = 'localdecide-' + window.__localdecide_next_handle;
+      el.__localdecide_handle = 'localdecide-' + window.__localdecide_document_id + '-' +
+                                window.__localdecide_next_handle;
     }
     const key = el.__localdecide_handle;
     if (seen.has(key)) return;
@@ -104,7 +113,10 @@ OBSERVE_JS = r"""
     if (editable && !sensitive) item.current_value = el.value || '';
     if (selectable) {
       item.current_value = el.value || '';
-      item.options = Array.from(el.options).slice(0, 200).map(o => ({label: clean(o.textContent), value: o.value || ''}));
+      item.options = Array.from(el.options)
+        .filter(o => !o.disabled && !(o.parentElement && o.parentElement.disabled))
+        .slice(0, 200)
+        .map(o => ({label: clean(o.textContent), value: o.value || ''}));
     }
     if (el.type === 'checkbox' || el.type === 'radio' || role === 'checkbox' || role === 'radio') item.checked = !!el.checked;
     if (el.disabled) item.disabled = true;
@@ -117,6 +129,34 @@ OBSERVE_JS = r"""
   return out;
 }
 """
+
+
+def _current_event_loop() -> Optional[asyncio.AbstractEventLoop]:
+    """Return the caller's loop without the deprecated idle-loop lookup.
+
+    Python 3.14 deprecates ``asyncio.get_event_loop_policy()`` itself. There is
+    still no public getter for a loop that is set but not running, so inspect the
+    policy's thread-local slot through that legacy compatibility API after checking
+    for a running loop. Suppress only that known policy deprecation. Keeping the
+    idle loop is important: ``PlaywrightDriver.close()`` must restore it exactly as
+    the constructor found it.
+    """
+    try:
+        return asyncio.get_running_loop()
+    except RuntimeError:
+        pass
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message=r"^'asyncio\.get_event_loop_policy' is deprecated",
+            category=DeprecationWarning,
+        )
+        policy = asyncio.get_event_loop_policy()
+    local = getattr(policy, "_local", None)
+    loop = getattr(local, "_loop", None)
+    if loop is None or loop.is_closed():
+        return None
+    return loop
 
 
 class _BaseDriver:
@@ -171,12 +211,7 @@ class PlaywrightDriver(_BaseDriver):
         # then finds "Event loop is closed!" - which is what happened when the real-website
         # battery created several drivers in a row. The fix is a fresh loop per driver,
         # started explicitly and restored after, so each driver owns its loop lifecycle.
-        import asyncio
-
-        try:
-            self._previous_loop = asyncio.get_event_loop()
-        except RuntimeError:
-            self._previous_loop = None
+        self._previous_loop = _current_event_loop()
         self._loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self._loop)
         self._pw = None
@@ -251,7 +286,7 @@ class PlaywrightDriver(_BaseDriver):
             elif operation in ("CLICK", "TYPE_TEXT", "SELECT"):
                 if element is None:
                     return {"ok": False, "detail": "no element"}
-                handle = self._resolve(element, operation)
+                handle = self._resolve(element, operation, text)
                 if operation == "CLICK":
                     handle.click(timeout=5000)
                 elif operation == "TYPE_TEXT" and text is not None:
@@ -260,6 +295,9 @@ class PlaywrightDriver(_BaseDriver):
                     if not text:
                         return {"ok": False, "detail": "SELECT with no option value"}
                     handle.select_option(text, timeout=5000)
+                    actual = handle.evaluate("el => String(el.value)")
+                    if actual != str(text):
+                        return {"ok": False, "detail": "select change handler did not retain the requested value"}
                 else:
                     return {"ok": False, "detail": f"{operation} needs a payload the loop did not provide"}
         except PlaywrightError as error:
@@ -280,12 +318,12 @@ class PlaywrightDriver(_BaseDriver):
         self._last_url_signature = signature
         return {"ok": True, "detail": "ok", "page_changed": changed}
 
-    def _resolve(self, element: ElementRef, operation: str):
+    def _resolve(self, element: ElementRef, operation: str, value: Optional[str] = None):
         """Resolve and validate the same DOM node that observation assigned a handle to."""
         if not isinstance(element.handle, str) or not element.handle:
             raise RuntimeError("target has no stable observation handle")
         payload = {"handle": element.handle, "expected": element.meta.get("identity", {}),
-                   "operation": operation}
+                   "operation": operation, "value": value}
         handle = self._page.evaluate_handle(
             """(payload) => {
                 const labelOf = (el) => {
@@ -311,6 +349,12 @@ class PlaywrightDriver(_BaseDriver):
                     ? 'password input rejected: vault access is not provided by this project'
                     : 'target is read-only');
                 if (payload.operation === 'SELECT' && el.tagName.toLowerCase() !== 'select') throw new Error('target is not a select');
+                if (payload.operation === 'SELECT') {
+                  const option = Array.from(el.options).find(item => String(item.value) === String(payload.value));
+                  if (!option) throw new Error('option is not present in the dropdown');
+                  if (option.disabled || (option.parentElement && option.parentElement.disabled))
+                    throw new Error('option is disabled');
+                }
                 const style = getComputedStyle(el);
                 const rect = el.getBoundingClientRect();
                 if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0' || rect.width < 1 || rect.height < 1)
@@ -435,9 +479,30 @@ class CDPDriver(_BaseDriver):
                 target = self._target_state(element, operation)
                 if operation == "CLICK":
                     x, y = target["x"], target["y"]
-                    for event_type in ("mousePressed", "mouseReleased"):
-                        self._call("Input.dispatchMouseEvent", type=event_type, x=x, y=y,
+                    pressed = False
+                    try:
+                        # Assume the event may have reached Chromium even if the transport
+                        # reports an error; cleanup is harmless when it did not.
+                        pressed = True
+                        self._call("Input.dispatchMouseEvent", type="mousePressed", x=x, y=y,
                                    button="left", clickCount=1)
+                        # CDP has no atomic press/release plus identity operation. Re-resolve
+                        # the handle and geometry in the gap; this is fail-closed cleanup,
+                        # not a transactional race solution.
+                        current = self._target_state(element, operation)
+                        if (current["x"], current["y"]) != (x, y):
+                            raise RuntimeError("target moved during click")
+                        self._call("Input.dispatchMouseEvent", type="mouseReleased", x=x, y=y,
+                                   button="left", clickCount=1)
+                        pressed = False
+                    except Exception as error:
+                        cleanup = ""
+                        if pressed:
+                            try:
+                                self._release_mouse_outside_target()
+                            except Exception as cleanup_error:
+                                cleanup = f"; mouse cleanup failed: {cleanup_error}"
+                        return {"ok": False, "detail": f"target changed during click: {error}{cleanup}"}
                 elif operation == "TYPE_TEXT" and text is not None:
                     self._eval(self._target_expression(element, operation, action="focus"))
                     self._call("Input.insertText", text=text)
@@ -501,9 +566,13 @@ class CDPDriver(_BaseDriver):
           if (payload.action === 'select') {{
             const option = Array.from(el.options || []).find(item => String(item.value) === String(payload.value));
             if (!option) return false;
+            if (option.disabled || (option.parentElement && option.parentElement.disabled))
+              throw new Error('option is disabled');
             el.focus(); el.value = payload.value;
             el.dispatchEvent(new Event('input', {{bubbles: true}}));
             el.dispatchEvent(new Event('change', {{bubbles: true}}));
+            if (String(el.value) !== String(payload.value))
+              throw new Error('select change handler did not retain the requested value');
             return true;
           }}
           return {{x: Math.round(rect.left + rect.width / 2), y: Math.round(rect.top + rect.height / 2)}};
@@ -516,6 +585,11 @@ class CDPDriver(_BaseDriver):
         if not isinstance(state, dict) or "x" not in state or "y" not in state:
             raise RuntimeError("target validation returned no current geometry")
         return state
+
+    def _release_mouse_outside_target(self) -> None:
+        """Release CDP's pressed button away from any actionable page target."""
+        self._call("Input.dispatchMouseEvent", type="mouseReleased", x=-1, y=-1,
+                   button="left", clickCount=1)
 
     def close(self) -> None:
         if getattr(self, "_closed", False):

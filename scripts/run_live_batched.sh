@@ -9,6 +9,14 @@ set -euo pipefail
 # Repo root = wherever this script lives (works on any machine, not just the author's Mac).
 cd "$(dirname "$0")/.." || exit 1
 
+if [ ! -f "tests/test_live.py" ] || [ ! -f "tests/_browser_child.py" ]; then
+  echo "Live batches require a source checkout containing tests/test_live.py and tests/_browser_child.py; installed standalone packages do not include tests. Run this script from the repository checkout." >&2
+  exit 2
+fi
+
+# Normal pytest collection is model-free; this launcher is the deliberate live opt-in.
+export LOCALDECIDE_RUN_LIVE=1
+
 if [ -n "${PYTHON:-}" ]; then
   PYTHON_BIN="$PYTHON"
 elif [ -x ".venv/bin/python" ]; then
@@ -27,6 +35,7 @@ BATCHES=(
   "TestMultilingual"
   "TestFlows"
   "TestMemorySafety"
+  "TestSubprocessLifecycle"
 )
 
 mem_free_percent() {

@@ -95,15 +95,21 @@ jobs:
           dist = Path(__import__("os").environ["RUNNER_TEMP"]) / "localdecide-dist"
           wheel = next(dist.glob("*.whl"))
           sdist = next(dist.glob("*.tar.gz"))
-          required = ("tests/_browser_child.py", "tests/fixtures/element_gym.html")
+          sdist_required = [
+              path.as_posix() for root in (Path("tests"), Path("docs"))
+              for path in root.rglob("*")
+              if path.is_file() and path.suffix in {".py", ".html", ".md"}
+          ]
+          assert sdist_required
           with zipfile.ZipFile(wheel) as archive:
               names = set(archive.namelist())
               assert any(name.endswith("scripts/run_live_batched.sh") for name in names)
-              assert all(any(name.endswith(item) for name in names) for item in required)
+              assert not any(name.split("/")[-2:-1] == ["tests"] for name in names)
+              assert not any("/tests/" in name or name.startswith("tests/") for name in names)
           with tarfile.open(sdist) as archive:
               names = set(archive.getnames())
               assert any(name.endswith("scripts/run_live_batched.sh") for name in names)
-              assert all(any(name.endswith(item) for name in names) for item in required)
+              assert all(any(name.endswith(item) for name in names) for item in sdist_required)
           PY
       - name: Install and exercise wheel and sdist in isolated environments
         run: |
@@ -112,24 +118,16 @@ jobs:
           cd "$RUNNER_TEMP"
           "$RUNNER_TEMP/wheel-venv/bin/python" - <<'PY'
           import importlib.util
-          from pathlib import Path
           assert importlib.util.find_spec("localdecide") is not None
-          tests_root = Path(importlib.util.find_spec("tests").submodule_search_locations[0])
-          assert (tests_root / "_browser_child.py").exists()
-          assert (tests_root / "fixtures" / "element_gym.html").exists()
-          assert "Subprocess entry point" in (tests_root / "_browser_child.py").read_text()
+          assert importlib.util.find_spec("tests") is None, "wheel must not install the tests namespace"
           PY
           test -f "$RUNNER_TEMP/wheel-venv/scripts/run_live_batched.sh"
           python -m venv "$RUNNER_TEMP/sdist-venv"
           "$RUNNER_TEMP/sdist-venv/bin/python" -m pip install --no-deps "$RUNNER_TEMP/localdecide-dist"/*.tar.gz
           "$RUNNER_TEMP/sdist-venv/bin/python" - <<'PY'
           import importlib.util
-          from pathlib import Path
           assert importlib.util.find_spec("localdecide") is not None
-          tests_root = Path(importlib.util.find_spec("tests").submodule_search_locations[0])
-          assert (tests_root / "_browser_child.py").exists()
-          assert (tests_root / "fixtures" / "element_gym.html").exists()
-          assert "Subprocess entry point" in (tests_root / "_browser_child.py").read_text()
+          assert importlib.util.find_spec("tests") is None, "installed sdist wheel must remain runtime-only"
           PY
           test -f "$RUNNER_TEMP/sdist-venv/scripts/run_live_batched.sh"
 

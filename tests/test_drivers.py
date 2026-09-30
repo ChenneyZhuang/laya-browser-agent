@@ -6,6 +6,7 @@ import json
 import sys
 import types
 import urllib.request
+import warnings
 
 import pytest
 
@@ -89,4 +90,53 @@ def test_playwright_constructor_failure_stops_runtime_and_restores_event_loop(mo
         assert asyncio.get_event_loop() is previous
     finally:
         previous.close()
+        asyncio.set_event_loop(None)
+
+
+def test_playwright_constructor_without_current_loop_has_no_deprecation_warning(monkeypatch):
+    import asyncio
+
+    class Page:
+        pass
+
+    state = {"closed": 0, "stopped": 0}
+
+    class Browser:
+        def new_page(self):
+            return Page()
+
+        def close(self):
+            state["closed"] += 1
+
+    class Chromium:
+        def launch(self, **kwargs):
+            return Browser()
+
+    class Runtime:
+        chromium = Chromium()
+
+        def stop(self):
+            state["stopped"] += 1
+
+    class Starter:
+        def start(self):
+            return Runtime()
+
+    playwright_module = types.ModuleType("playwright")
+    sync_module = types.ModuleType("playwright.sync_api")
+    sync_module.sync_playwright = lambda: Starter()
+    playwright_module.sync_api = sync_module
+    monkeypatch.setitem(sys.modules, "playwright", playwright_module)
+    monkeypatch.setitem(sys.modules, "playwright.sync_api", sync_module)
+
+    asyncio.set_event_loop(None)
+    try:
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            driver = PlaywrightDriver()
+            driver.close()
+            driver.close()
+        assert not [warning for warning in caught if warning.category is DeprecationWarning]
+        assert state == {"closed": 1, "stopped": 1}
+    finally:
         asyncio.set_event_loop(None)

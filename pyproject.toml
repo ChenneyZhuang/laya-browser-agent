@@ -21,10 +21,10 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
-# Apple Silicon: fastest path, ~10-30 ms per decision on an M-series chip.
+# Apple Silicon: MLX runtime for Apple Silicon (Python >=3.11).
 mlx = ["laya-mlx>=0.1.0"]
 # Everywhere else: the same checkpoints through PyTorch.
-torch = ["laya>=0.3.3"]
+torch = ["laya>=0.3.21"]
 # Real browser control.
 playwright = ["playwright>=1.40"]
 # Attach to a Chrome you already have open and logged in.
@@ -41,14 +41,13 @@ localdecide = "localdecide.cli:main"
 localdecide-mcp = "localdecide.mcp_server:serve"
 
 [tool.setuptools]
-packages = ["localdecide", "localdecide.backends", "tests"]
+packages = ["localdecide", "localdecide.backends"]
 
 [tool.setuptools.data-files]
 "scripts" = ["scripts/run_live_batched.sh"]
 
 [tool.setuptools.package-data]
 localdecide = ["py.typed"]
-tests = ["*.py", "fixtures/*.html"]
 
 [tool.ruff]
 line-length = 120

@@ -117,6 +117,18 @@ def test_renamed_or_replaced_target_fails_closed(driver):
     assert "missing" in result["detail"] or "identity" in result["detail"]
 
 
+def test_observation_handles_do_not_cross_document_boundaries(driver):
+    table = _table(driver)
+    target = _ref(table, "Delete")
+    # The new document deliberately has the same first target and label. A document-local
+    # counter alone would reuse localdecide-1 and click the new, unrelated node.
+    driver._page.set_content(HTML)
+    result = driver.execute("CLICK", target)
+    assert not result["ok"]
+    assert "missing" in result["detail"] or "identity" in result["detail"]
+    assert driver._page.locator("body").get_attribute("data-clicked") is None
+
+
 def test_reorder_does_not_use_stale_coordinates(driver):
     table = _table(driver)
     target = _ref(table, "Delete")
@@ -158,3 +170,88 @@ def test_select_and_type_resolve_current_stable_nodes(driver):
     assert selected["ok"], selected
     assert driver._page.locator("#query").input_value() == "hello"
     assert driver._page.locator("#country").input_value() == "jp"
+
+
+def test_select_uses_actual_value_and_rejects_disabled_options(driver):
+    table = _table(driver)
+    country = _ref(table, "Country")
+    driver._page.evaluate("""
+      const select = document.querySelector('#country');
+      select.insertAdjacentHTML('beforeend',
+        '<option value="disabled-value" disabled>Disabled label</option>' +
+        '<optgroup disabled><option value="group-disabled">Group disabled</option></optgroup>' +
+        '<option value="actual-value">Visible label</option>');
+    """)
+    refreshed = next(element for element in _table(driver).elements if element.label == "Country")
+    assert "disabled-value" not in {option["value"] for option in refreshed.options}
+    assert "group-disabled" not in {option["value"] for option in refreshed.options}
+
+    disabled = driver.execute("SELECT", country, "disabled-value")
+    assert not disabled["ok"]
+    assert "disabled" in disabled["detail"]
+
+    selected = driver.execute("SELECT", country, "actual-value")
+    assert selected["ok"], selected
+    assert driver._page.locator("#country").input_value() == "actual-value"
+
+
+def test_select_rejects_a_change_handler_that_reverts_the_value(driver):
+    country = _ref(_table(driver), "Country")
+    driver._page.evaluate("""
+      const select = document.querySelector('#country');
+      select.addEventListener('change', () => { select.value = 'au'; });
+    """)
+    result = driver.execute("SELECT", country, "jp")
+    assert not result["ok"]
+    assert "did not retain" in result["detail"]
+    assert driver._page.locator("#country").input_value() == "au"
+
+
+def test_cdp_rechecks_target_between_mouse_events(driver):
+    if not isinstance(driver, CDPDriver):
+        pytest.skip("the mouse-event gap is specific to CDP execution")
+    driver._page.set_content("""
+      <button id="race" onmousedown="this.replaceWith(document.createElement('button'))"
+              onclick="document.body.dataset.clicked='race'">Race target</button>
+    """)
+    target = _ref(_table(driver), "Race target")
+    events = []
+    real_call = driver._call
+
+    def record(method, **params):
+        events.append((method, params))
+        return real_call(method, **params)
+
+    driver._call = record
+    result = driver.execute("CLICK", target)
+    assert not result["ok"]
+    assert "during click" in result["detail"]
+    assert driver._page.locator("body").get_attribute("data-clicked") is None
+    assert any(method == "Input.dispatchMouseEvent" and params.get("type") == "mouseReleased"
+               and params.get("x", 0) < 0 and params.get("y", 0) < 0
+               for method, params in events)
+
+
+def test_cdp_fails_closed_when_target_moves_between_mouse_events(driver):
+    if not isinstance(driver, CDPDriver):
+        pytest.skip("the mouse-event gap is specific to CDP execution")
+    driver._page.set_content("""
+      <button id="moving" onmousedown="this.style.transform='translateX(120px)'"
+              onclick="document.body.dataset.clicked='moving'">Moving target</button>
+    """)
+    target = _ref(_table(driver), "Moving target")
+    events = []
+    real_call = driver._call
+
+    def record(method, **params):
+        events.append((method, params))
+        return real_call(method, **params)
+
+    driver._call = record
+    result = driver.execute("CLICK", target)
+    assert not result["ok"]
+    assert "moved during click" in result["detail"]
+    assert driver._page.locator("body").get_attribute("data-clicked") is None
+    assert any(method == "Input.dispatchMouseEvent" and params.get("type") == "mouseReleased"
+               and params.get("x", 0) < 0 and params.get("y", 0) < 0
+               for method, params in events)
