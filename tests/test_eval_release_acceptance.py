@@ -11,6 +11,7 @@ import json
 import pathlib
 import sys
 import types
+import copy
 
 import pytest
 
@@ -101,6 +102,8 @@ def test_module_import_and_prepare_never_import_torch_or_laya(tmp_path, monkeypa
     manifest = json.loads((output / "manifest.json").read_text())
     assert len(manifest["checkpoint_files"]) == 1
     assert manifest["wire"]["rendering"] == "original_wire_state_and_questions"
+    assert manifest["wire"]["backend_questions"].startswith("Decider_deployed")
+    assert manifest["settings"]["max_options_per_question"] == 20
 
 
 def test_duplicate_ids_in_95_item_wire_are_rejected():
@@ -139,6 +142,119 @@ def test_sparse_target_indices_are_resolved_by_wire_key_not_position():
     assert rows[0]["label"] == "Good target"
     assert rows[0]["semantic_ok"] is True
     assert rows[0]["handoff_ok"] is True
+
+
+def test_wide_second_round_scores_merged_answers_and_audits_every_call():
+    item = _item(target_keys=tuple(str(index) for index in range(1, 22)))
+    item["accepted"] = ["Merged target"]
+    item["index_labels"] = {
+        str(index): ("Merged target" if index == 2 else f"Other {index}")
+        for index in range(1, 22)
+    }
+    original = copy.deepcopy(item)
+
+    def answers(questions):
+        result = {}
+        for name, question in questions.items():
+            keys = list(question["criteria"])
+            if name == "operation":
+                chosen, probabilities = "CLICK", {"CLICK": 0.9, "TYPE_TEXT": 0.1}
+            elif name == "click_target__chunk0":
+                chosen = "3"
+                probabilities = {key: (0.51 if key == "3" else 0.49 if key == "5" else 0.0) for key in keys}
+            elif name == "click_target__chunk1":
+                chosen = "2"
+                probabilities = {key: (0.99 if key == "2" else 0.01 if key == "4" else 0.0) for key in keys}
+            else:
+                # The final round only contains the chunk winners.  Its winner
+                # is deliberately not the winner after probability recombination.
+                chosen = "3"
+                probabilities = {key: (0.5001 if key == "3" else 0.4999 if key == "2" else 0.0) for key in keys}
+            result[name] = {
+                "type": "choice", "choice": chosen, "probabilities": probabilities,
+                "confidence": probabilities[chosen], "action": {"act_probability": 1.0},
+            }
+        return result
+
+    rows = runner.evaluate_items([item], _backend(FakeAgent(answers)))
+    row = rows[0]
+    assert row["operation_key"] == "CLICK"
+    assert row["operation"] == "CLICK"
+    assert row["target"] == "2"
+    assert row["semantic_ok"] is True
+    assert row["prediction"]["answers"]["click_target"]["choice"] == "3"
+    assert row["validated_answers"]["click_target"]["choice"] == "2"
+    assert len(row["backend_calls"]) == 2
+    assert "operation" in row["backend_calls"][0]["questions"]
+    assert "operation" not in row["backend_calls"][1]["questions"]
+    assert row["question_transformed"] is True
+    assert item == original
+
+
+def test_numeric_operation_missing_from_original_criteria_cannot_score():
+    item = _item()
+
+    def answers(questions):
+        out = FakeAgent().predict(None, questions)["answers"]
+        out["operation"]["choice"] = "2"
+        return out
+
+    row = runner.evaluate_items([item], _backend(FakeAgent(answers)))[0]
+    assert row["error_count"] == 1
+    assert row["semantic_ok"] is False
+    assert row["operation_key"] is None
+
+
+def test_numeric_operation_offered_key_uses_only_unambiguous_criteria_value():
+    item = _item()
+    item["questions"]["operation"]["criteria"] = {"1": "CLICK", "2": "TYPE_TEXT"}
+
+    def answers(questions):
+        out = FakeAgent().predict(None, questions)["answers"]
+        out["operation"] = {
+            "type": "choice", "choice": "1", "probabilities": {"1": 0.9, "2": 0.1},
+            "confidence": 0.9, "action": {"act_probability": 1.0},
+        }
+        out["click_target"]["choice"] = "7"
+        out["click_target"]["probabilities"] = {"2": 0.1, "7": 0.9}
+        return out
+
+    row = runner.evaluate_items([item], _backend(FakeAgent(answers)))[0]
+    assert row["operation_key"] == "1"
+    assert row["operation"] == "CLICK"
+    assert row["operation_selected_probability"] == pytest.approx(0.9)
+    assert row["semantic_ok"] is True
+
+
+def test_numeric_operation_ambiguous_criteria_value_is_an_error():
+    item = _item()
+    item["questions"]["operation"]["criteria"] = {"1": "CLICK or TYPE_TEXT", "2": "WAIT"}
+
+    def answers(questions):
+        out = FakeAgent().predict(None, questions)["answers"]
+        out["operation"] = {
+            "type": "choice", "choice": "1", "probabilities": {"1": 0.9, "2": 0.1},
+            "confidence": 0.9, "action": {"act_probability": 1.0},
+        }
+        return out
+
+    row = runner.evaluate_items([item], _backend(FakeAgent(answers)))[0]
+    assert row["error_count"] == 1
+    assert row["operation_key"] == "1"
+    assert row["operation"] is None
+    assert row["semantic_ok"] is False
+
+
+@pytest.mark.parametrize("operation", ["WAIT", "BLOCKED", "DONE", "SCROLL_DOWN", "SCROLL_UP"])
+def test_valid_non_target_operation_is_a_pick_miss_not_contract_error(operation):
+    item = _item(op_keys=(operation, "CLICK"))
+    row = runner.evaluate_items([item], _backend(FakeAgent()))[0]
+    assert row["validated"] is True
+    assert row["error"] is None
+    assert row["operation"] == operation
+    assert row["operation_selected_probability"] == 1.0
+    assert row["target"] is None
+    assert row["semantic_ok"] is False
 
 
 def test_restraint_is_a_joint_operation_result_for_both_rules():
@@ -200,6 +316,30 @@ def test_invalid_raw_prediction_counts_nonfinite_and_keeps_row_error():
     assert rows[0]["error_count"] == 1
     assert rows[0]["nonfinite_count"] >= 1
     assert rows[0]["prediction"]["answers"]["operation"]["probabilities"]["CLICK"] != rows[0]["prediction"]["answers"]["operation"]["probabilities"]["CLICK"]
+    assert rows[0]["backend_calls"][0]["raw_envelope"]["answers"]["operation"]["probabilities"]["CLICK"] != 1.0
+
+
+def test_backend_exception_is_recorded_and_smoke_calls_do_not_leak_into_case():
+    class FlakyAgent(FakeAgent):
+        def __init__(self):
+            super().__init__()
+            self.fail = False
+
+        def predict(self, state, questions):
+            if self.fail:
+                raise RuntimeError("synthetic backend failure")
+            return super().predict(state, questions)
+
+    agent = FlakyAgent()
+    backend = _backend(agent)
+    runner.smoke_typed_contract(backend)
+    agent.fail = True
+    row = runner.evaluate_items([_item()], backend)[0]
+    assert row["error_count"] == 1
+    assert row["prediction"] is None
+    assert len(row["backend_calls"]) == 1
+    assert row["backend_calls"][0]["raw_envelope"] is None
+    assert "synthetic backend failure" in row["backend_calls"][0]["error"]
 
 
 def test_gpu_guard_limits_and_ignores_broad_shell_false_positive():
@@ -309,13 +449,21 @@ def test_execute_cli_preserves_error_exit_status(monkeypatch, tmp_path):
 
 def test_full_95_fake_run_has_complete_unique_raw_rows_and_null_joint_ece():
     items = runner.validate_items(_items())
+    original = copy.deepcopy(items)
     rows = runner.evaluate_items(items, _backend(FakeAgent()), warmup=3)
     assert len(rows) == 95
     assert len({row["id"] for row in rows}) == 95
     assert sum(row["warmup"] for row in rows) == 3
     assert all("gold" in row and "prediction" in row for row in rows)
+    assert items == original
+    assert sum(row["question_transformed"] for row in rows) == 47
+    assert sum(len(row["backend_calls"]) for row in rows) == 142
     report = runner.build_report(rows, {"schema": "test"}, smoke={"ok": True})
     assert report["calibration"]["joint_ece"] is None
     assert "marginal" in report["calibration"]["joint_ece_explanation"]
+    assert report["scoring_source"] == "decision.answers.raw (merged validated answers)"
+    assert report["decider"]["max_options_per_question"] == 20
+    assert report["decider"]["coarse_to_fine_cases"] == 47
+    assert report["rendering"]["wire_input"] == "original_wire_state_and_questions"
     assert report["slices"]["suite"]["pick"]["n"] == 79
     assert report["slices"]["suite"]["restraint"]["n"] == 16
