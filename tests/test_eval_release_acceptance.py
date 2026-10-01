@@ -9,6 +9,7 @@ from __future__ import annotations
 import copy
 import importlib.util
 import json
+import os
 import pathlib
 import sys
 import types
@@ -235,7 +236,8 @@ def test_module_import_and_prepare_never_import_torch_or_laya(tmp_path, items_pa
     assert result["rows"] == 95
     assert "torch" not in runner.__dict__
     assert "laya" not in runner.__dict__
-    assert (output / "manifest.json").stat().st_mode & 0o777 == 0o600
+    if os.name == "posix":
+        assert (output / "manifest.json").stat().st_mode & 0o777 == 0o600
     manifest = json.loads((output / "manifest.json").read_text())
     assert len(manifest["checkpoint_files"]) == 1
     assert manifest["wire"]["rendering"] == "original_wire_state_and_questions"
@@ -517,7 +519,9 @@ def test_hashes_include_all_checkpoint_files_and_framework_evidence(tmp_path, it
     (checkpoint / "model.safetensors").write_bytes(b"one")
     (checkpoint / "nested" / "tokenizer.json").write_text("{}", encoding="utf-8")
     records = runner.hash_checkpoint(checkpoint.resolve())
-    assert [record["relative_path"] for record in records] == ["model.safetensors", "nested/tokenizer.json"]
+    assert [record["relative_path"] for record in records] == [
+        "model.safetensors", str(pathlib.Path("nested") / "tokenizer.json")
+    ]
     manifest = runner.build_manifest(checkpoint.resolve(), items_path.resolve(), _items(),
                                      (tmp_path / "out").resolve(), 1218)
     framework_names = {pathlib.Path(record["path"]).name for record in manifest["input_scorer_framework_hashes"]["scorer_and_framework"]}
@@ -526,10 +530,31 @@ def test_hashes_include_all_checkpoint_files_and_framework_evidence(tmp_path, it
 
 def test_file_lock_is_exclusive(tmp_path):
     lock_path = tmp_path / "logs" / "release_acceptance" / "gpu.lock"
-    with runner.gpu_lock(lock_path):
-        with pytest.raises(runner.SafetyError, match="already held"):
+    if os.name == "posix":
+        with runner.gpu_lock(lock_path):
+            with pytest.raises(runner.SafetyError, match="already held"):
+                with runner.gpu_lock(lock_path):
+                    pass
+    else:
+        entered = False
+        with pytest.raises(runner.SafetyError) as exc_info:
             with runner.gpu_lock(lock_path):
-                pass
+                entered = True
+        assert str(exc_info.value) == "fcntl is required for the Linux execute lock"
+        assert entered is False
+        assert not lock_path.exists()
+
+
+def test_file_lock_fails_closed_when_fcntl_import_is_unavailable(monkeypatch, tmp_path):
+    lock_path = tmp_path / "logs" / "release_acceptance" / "gpu.lock"
+    monkeypatch.setitem(sys.modules, "fcntl", None)
+    entered = False
+    with pytest.raises(runner.SafetyError) as exc_info:
+        with runner.gpu_lock(lock_path):
+            entered = True
+    assert str(exc_info.value) == "fcntl is required for the Linux execute lock"
+    assert entered is False
+    assert not lock_path.exists()
 
 
 def test_module_and_instance_to_guards_refuse_cpu_mps_but_allow_dtype():
