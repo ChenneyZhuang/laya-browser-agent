@@ -1,0 +1,837 @@
+{
+  "run_id": "20261001T054646Z-corrected",
+  "arms": {
+    "official-multilingual-deployed": {
+      "counts": {
+        "rows": 95,
+        "unique_ids": 95,
+        "errors": 0,
+        "nonfinite_values": 0
+      },
+      "overall": {
+        "n": 95,
+        "errors": 0,
+        "nonfinite_values": 0,
+        "operation_semantic": 0.031579,
+        "operation_handoff": 0.021053,
+        "target": 0.178947,
+        "joint_semantic": 0.031579,
+        "joint_handoff": 0.021053
+      },
+      "pick": {
+        "n": 79,
+        "errors": 0,
+        "nonfinite_values": 0,
+        "operation_semantic": 0.012658,
+        "operation_handoff": 0.0,
+        "target": 0.012658,
+        "joint_semantic": 0.012658,
+        "joint_handoff": 0.0
+      },
+      "restraint": {
+        "n": 16,
+        "errors": 0,
+        "nonfinite_values": 0,
+        "operation_semantic": 0.125,
+        "operation_handoff": 0.125,
+        "target": 1.0,
+        "joint_semantic": 0.125,
+        "joint_handoff": 0.125
+      },
+      "decider": {
+        "max_options_per_question": 20,
+        "coarse_to_fine_cases": 47,
+        "wire_input_cases": 95,
+        "backend_call_count": 142
+      },
+      "latency": {
+        "warmup_excluded": 3,
+        "n": 92,
+        "p50_ms": 62.032,
+        "p95_ms": 114.2,
+        "synchronized": true
+      },
+      "scoring_source": "decision.answers.raw (merged validated answers)",
+      "prediction_source": "last_backend_call_raw_envelope",
+      "environment_versions": {
+        "python": "3.12.14 (main, Sep  1 2026, 14:16:52) [Clang 22.1.3 ]",
+        "platform": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.43",
+        "system": "Linux",
+        "machine": "x86_64",
+        "laya_distribution": "0.3.4",
+        "torch_distribution": "2.14.0",
+        "torch_runtime": "2.14.0+cu130",
+        "laya_runtime": "0.3.4"
+      },
+      "report_sha256": "b748a35106284fb8113db7573518e3e5531e1f1348933c2c6205c0cefc13da72",
+      "operation_ece": {
+        "ece": 0.567581,
+        "n": 95,
+        "bins": [
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "n": 41,
+            "accuracy": 0.02439,
+            "mean_selected_probability": 0.46572,
+            "gap": 0.441329
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "n": 24,
+            "accuracy": 0.041667,
+            "mean_selected_probability": 0.542604,
+            "gap": 0.500938
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "n": 5,
+            "accuracy": 0.2,
+            "mean_selected_probability": 0.66458,
+            "gap": 0.46458
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "n": 7,
+            "accuracy": 0.0,
+            "mean_selected_probability": 0.749314,
+            "gap": 0.749314
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "n": 9,
+            "accuracy": 0.0,
+            "mean_selected_probability": 0.836222,
+            "gap": 0.836222
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "n": 9,
+            "accuracy": 0.0,
+            "mean_selected_probability": 0.967678,
+            "gap": 0.967678
+          }
+        ],
+        "definition": "accuracy versus selected operation probability",
+        "accuracy_key": "operation_semantic_ok"
+      },
+      "joint_ece": null,
+      "correct_counts": {
+        "operation_semantic_ok": 3,
+        "operation_handoff_ok": 2,
+        "target_ok": 17,
+        "semantic_ok": 3,
+        "handoff_ok": 2
+      },
+      "smoke_ok": true,
+      "state_slices": {
+        "calendar": {
+          "n": 11,
+          "errors": 0,
+          "nonfinite_values": 0,
+          "operation_semantic": 0.090909,
+          "operation_handoff": 0.0,
+          "target": 0.181818,
+          "joint_semantic": 0.090909,
+          "joint_handoff": 0.0
+        },
+        "compose": {
+          "n": 16,
+          "errors": 0,
+          "nonfinite_values": 0,
+          "operation_semantic": 0.0,
+          "operation_handoff": 0.0,
+          "target": 0.1875,
+          "joint_semantic": 0.0,
+          "joint_handoff": 0.0
+        },
+        "files": {
+          "n": 8,
+          "errors": 0,
+          "nonfinite_values": 0,
+          "operation_semantic": 0.0,
+          "operation_handoff": 0.0,
+          "target": 0.25,
+          "joint_semantic": 0.0,
+          "joint_handoff": 0.0
+        },
+        "inbox": {
+          "n": 36,
+          "errors": 0,
+          "nonfinite_values": 0,
+          "operation_semantic": 0.055556,
+          "operation_handoff": 0.055556,
+          "target": 0.166667,
+          "joint_semantic": 0.055556,
+          "joint_handoff": 0.055556
+        },
+        "people": {
+          "n": 5,
+          "errors": 0,
+          "nonfinite_values": 0,
+          "operation_semantic": 0.0,
+          "operation_handoff": 0.0,
+          "target": 0.0,
+          "joint_semantic": 0.0,
+          "joint_handoff": 0.0
+        },
+        "search": {
+          "n": 5,
+          "errors": 0,
+          "nonfinite_values": 0,
+          "operation_semantic": 0.0,
+          "operation_handoff": 0.0,
+          "target": 0.2,
+          "joint_semantic": 0.0,
+          "joint_handoff": 0.0
+        },
+        "settings": {
+          "n": 6,
+          "errors": 0,
+          "nonfinite_values": 0,
+          "operation_semantic": 0.0,
+          "operation_handoff": 0.0,
+          "target": 0.166667,
+          "joint_semantic": 0.0,
+          "joint_handoff": 0.0
+        },
+        "ticket": {
+          "n": 8,
+          "errors": 0,
+          "nonfinite_values": 0,
+          "operation_semantic": 0.0,
+          "operation_handoff": 0.0,
+          "target": 0.25,
+          "joint_semantic": 0.0,
+          "joint_handoff": 0.0
+        }
+      }
+    },
+    "official-multilingual-direct": {
+      "counts": {
+        "rows": 95,
+        "unique_ids": 95,
+        "errors": 0,
+        "nonfinite_values": 0
+      },
+      "overall": {
+        "n": 95,
+        "errors": 0,
+        "nonfinite_values": 0,
+        "operation_semantic": 0.031579,
+        "operation_handoff": 0.021053,
+        "target": 0.178947,
+        "joint_semantic": 0.031579,
+        "joint_handoff": 0.021053
+      },
+      "pick": {
+        "n": 79,
+        "errors": 0,
+        "nonfinite_values": 0,
+        "operation_semantic": 0.012658,
+        "operation_handoff": 0.0,
+        "target": 0.012658,
+        "joint_semantic": 0.012658,
+        "joint_handoff": 0.0
+      },
+      "restraint": {
+        "n": 16,
+        "errors": 0,
+        "nonfinite_values": 0,
+        "operation_semantic": 0.125,
+        "operation_handoff": 0.125,
+        "target": 1.0,
+        "joint_semantic": 0.125,
+        "joint_handoff": 0.125
+      },
+      "decider": {
+        "max_options_per_question": 100000,
+        "coarse_to_fine_cases": 0,
+        "wire_input_cases": 95,
+        "backend_call_count": 95
+      },
+      "latency": {
+        "warmup_excluded": 3,
+        "n": 92,
+        "p50_ms": 39.687,
+        "p95_ms": 65.492,
+        "synchronized": true
+      },
+      "scoring_source": "decision.answers.raw (merged validated answers)",
+      "prediction_source": "last_backend_call_raw_envelope",
+      "environment_versions": {
+        "python": "3.12.14 (main, Sep  1 2026, 14:16:52) [Clang 22.1.3 ]",
+        "platform": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.43",
+        "system": "Linux",
+        "machine": "x86_64",
+        "laya_distribution": "0.3.4",
+        "torch_distribution": "2.14.0",
+        "torch_runtime": "2.14.0+cu130",
+        "laya_runtime": "0.3.4"
+      },
+      "report_sha256": "ce60e67b373ae004185d91dc24bbc65230932b6dc965c1186f5220c0aab31474",
+      "operation_ece": {
+        "ece": 0.566882,
+        "n": 95,
+        "bins": [
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "n": 41,
+            "accuracy": 0.02439,
+            "mean_selected_probability": 0.466071,
+            "gap": 0.44168
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "n": 23,
+            "accuracy": 0.043478,
+            "mean_selected_probability": 0.536335,
+            "gap": 0.492857
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "n": 7,
+            "accuracy": 0.142857,
+            "mean_selected_probability": 0.661971,
+            "gap": 0.519114
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "n": 6,
+            "accuracy": 0.0,
+            "mean_selected_probability": 0.756717,
+            "gap": 0.756717
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "n": 9,
+            "accuracy": 0.0,
+            "mean_selected_probability": 0.836222,
+            "gap": 0.836222
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "n": 9,
+            "accuracy": 0.0,
+            "mean_selected_probability": 0.967678,
+            "gap": 0.967678
+          }
+        ],
+        "definition": "accuracy versus selected operation probability",
+        "accuracy_key": "operation_semantic_ok"
+      },
+      "joint_ece": null,
+      "correct_counts": {
+        "operation_semantic_ok": 3,
+        "operation_handoff_ok": 2,
+        "target_ok": 17,
+        "semantic_ok": 3,
+        "handoff_ok": 2
+      },
+      "smoke_ok": true,
+      "state_slices": {
+        "calendar": {
+          "n": 11,
+          "errors": 0,
+          "nonfinite_values": 0,
+          "operation_semantic": 0.090909,
+          "operation_handoff": 0.0,
+          "target": 0.181818,
+          "joint_semantic": 0.090909,
+          "joint_handoff": 0.0
+        },
+        "compose": {
+          "n": 16,
+          "errors": 0,
+          "nonfinite_values": 0,
+          "operation_semantic": 0.0,
+          "operation_handoff": 0.0,
+          "target": 0.1875,
+          "joint_semantic": 0.0,
+          "joint_handoff": 0.0
+        },
+        "files": {
+          "n": 8,
+          "errors": 0,
+          "nonfinite_values": 0,
+          "operation_semantic": 0.0,
+          "operation_handoff": 0.0,
+          "target": 0.25,
+          "joint_semantic": 0.0,
+          "joint_handoff": 0.0
+        },
+        "inbox": {
+          "n": 36,
+          "errors": 0,
+          "nonfinite_values": 0,
+          "operation_semantic": 0.055556,
+          "operation_handoff": 0.055556,
+          "target": 0.166667,
+          "joint_semantic": 0.055556,
+          "joint_handoff": 0.055556
+        },
+        "people": {
+          "n": 5,
+          "errors": 0,
+          "nonfinite_values": 0,
+          "operation_semantic": 0.0,
+          "operation_handoff": 0.0,
+          "target": 0.0,
+          "joint_semantic": 0.0,
+          "joint_handoff": 0.0
+        },
+        "search": {
+          "n": 5,
+          "errors": 0,
+          "nonfinite_values": 0,
+          "operation_semantic": 0.0,
+          "operation_handoff": 0.0,
+          "target": 0.2,
+          "joint_semantic": 0.0,
+          "joint_handoff": 0.0
+        },
+        "settings": {
+          "n": 6,
+          "errors": 0,
+          "nonfinite_values": 0,
+          "operation_semantic": 0.0,
+          "operation_handoff": 0.0,
+          "target": 0.166667,
+          "joint_semantic": 0.0,
+          "joint_handoff": 0.0
+        },
+        "ticket": {
+          "n": 8,
+          "errors": 0,
+          "nonfinite_values": 0,
+          "operation_semantic": 0.0,
+          "operation_handoff": 0.0,
+          "target": 0.25,
+          "joint_semantic": 0.0,
+          "joint_handoff": 0.0
+        }
+      }
+    },
+    "v32b-deployed": {
+      "counts": {
+        "rows": 95,
+        "unique_ids": 95,
+        "errors": 0,
+        "nonfinite_values": 0
+      },
+      "overall": {
+        "n": 95,
+        "errors": 0,
+        "nonfinite_values": 0,
+        "operation_semantic": 0.747368,
+        "operation_handoff": 0.726316,
+        "target": 0.821053,
+        "joint_semantic": 0.652632,
+        "joint_handoff": 0.610526
+      },
+      "pick": {
+        "n": 79,
+        "errors": 0,
+        "nonfinite_values": 0,
+        "operation_semantic": 0.898734,
+        "operation_handoff": 0.873418,
+        "target": 0.78481,
+        "joint_semantic": 0.78481,
+        "joint_handoff": 0.734177
+      },
+      "restraint": {
+        "n": 16,
+        "errors": 0,
+        "nonfinite_values": 0,
+        "operation_semantic": 0.0,
+        "operation_handoff": 0.0,
+        "target": 1.0,
+        "joint_semantic": 0.0,
+        "joint_handoff": 0.0
+      },
+      "decider": {
+        "max_options_per_question": 20,
+        "coarse_to_fine_cases": 47,
+        "wire_input_cases": 95,
+        "backend_call_count": 142
+      },
+      "latency": {
+        "warmup_excluded": 3,
+        "n": 92,
+        "p50_ms": 41.093,
+        "p95_ms": 119.201,
+        "synchronized": true
+      },
+      "scoring_source": "decision.answers.raw (merged validated answers)",
+      "prediction_source": "last_backend_call_raw_envelope",
+      "environment_versions": {
+        "python": "3.12.14 (main, Sep  1 2026, 14:16:52) [Clang 22.1.3 ]",
+        "platform": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.43",
+        "system": "Linux",
+        "machine": "x86_64",
+        "laya_distribution": "0.3.4",
+        "torch_distribution": "2.14.0",
+        "torch_runtime": "2.14.0+cu130",
+        "laya_runtime": "0.3.4"
+      },
+      "report_sha256": "7367a4ec9ba004c6ecb4ec7bb957ffb6842df0852c7e5b7e966e4ca2ea2d27e7",
+      "operation_ece": {
+        "ece": 0.232045,
+        "n": 95,
+        "bins": [
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "n": 2,
+            "accuracy": 0.5,
+            "mean_selected_probability": 0.57175,
+            "gap": 0.07175
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "n": 1,
+            "accuracy": 0.0,
+            "mean_selected_probability": 0.6039,
+            "gap": 0.6039
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "n": 1,
+            "accuracy": 0.0,
+            "mean_selected_probability": 0.7179,
+            "gap": 0.7179
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "n": 91,
+            "accuracy": 0.769231,
+            "mean_selected_probability": 0.995374,
+            "gap": 0.226143
+          }
+        ],
+        "definition": "accuracy versus selected operation probability",
+        "accuracy_key": "operation_semantic_ok"
+      },
+      "joint_ece": null,
+      "correct_counts": {
+        "operation_semantic_ok": 71,
+        "operation_handoff_ok": 69,
+        "target_ok": 78,
+        "semantic_ok": 62,
+        "handoff_ok": 58
+      },
+      "smoke_ok": true,
+      "state_slices": {
+        "calendar": {
+          "n": 11,
+          "errors": 0,
+          "nonfinite_values": 0,
+          "operation_semantic": 0.636364,
+          "operation_handoff": 0.727273,
+          "target": 0.727273,
+          "joint_semantic": 0.636364,
+          "joint_handoff": 0.636364
+        },
+        "compose": {
+          "n": 16,
+          "errors": 0,
+          "nonfinite_values": 0,
+          "operation_semantic": 0.75,
+          "operation_handoff": 0.625,
+          "target": 0.875,
+          "joint_semantic": 0.6875,
+          "joint_handoff": 0.5625
+        },
+        "files": {
+          "n": 8,
+          "errors": 0,
+          "nonfinite_values": 0,
+          "operation_semantic": 0.75,
+          "operation_handoff": 0.75,
+          "target": 1.0,
+          "joint_semantic": 0.75,
+          "joint_handoff": 0.75
+        },
+        "inbox": {
+          "n": 36,
+          "errors": 0,
+          "nonfinite_values": 0,
+          "operation_semantic": 0.805556,
+          "operation_handoff": 0.833333,
+          "target": 0.777778,
+          "joint_semantic": 0.611111,
+          "joint_handoff": 0.611111
+        },
+        "people": {
+          "n": 5,
+          "errors": 0,
+          "nonfinite_values": 0,
+          "operation_semantic": 0.4,
+          "operation_handoff": 0.2,
+          "target": 0.4,
+          "joint_semantic": 0.4,
+          "joint_handoff": 0.2
+        },
+        "search": {
+          "n": 5,
+          "errors": 0,
+          "nonfinite_values": 0,
+          "operation_semantic": 0.8,
+          "operation_handoff": 0.8,
+          "target": 1.0,
+          "joint_semantic": 0.8,
+          "joint_handoff": 0.8
+        },
+        "settings": {
+          "n": 6,
+          "errors": 0,
+          "nonfinite_values": 0,
+          "operation_semantic": 0.833333,
+          "operation_handoff": 0.833333,
+          "target": 1.0,
+          "joint_semantic": 0.833333,
+          "joint_handoff": 0.833333
+        },
+        "ticket": {
+          "n": 8,
+          "errors": 0,
+          "nonfinite_values": 0,
+          "operation_semantic": 0.75,
+          "operation_handoff": 0.625,
+          "target": 0.875,
+          "joint_semantic": 0.625,
+          "joint_handoff": 0.5
+        }
+      }
+    },
+    "v32b-direct": {
+      "counts": {
+        "rows": 95,
+        "unique_ids": 95,
+        "errors": 0,
+        "nonfinite_values": 0
+      },
+      "overall": {
+        "n": 95,
+        "errors": 0,
+        "nonfinite_values": 0,
+        "operation_semantic": 0.747368,
+        "operation_handoff": 0.726316,
+        "target": 0.831579,
+        "joint_semantic": 0.663158,
+        "joint_handoff": 0.621053
+      },
+      "pick": {
+        "n": 79,
+        "errors": 0,
+        "nonfinite_values": 0,
+        "operation_semantic": 0.898734,
+        "operation_handoff": 0.873418,
+        "target": 0.797468,
+        "joint_semantic": 0.797468,
+        "joint_handoff": 0.746835
+      },
+      "restraint": {
+        "n": 16,
+        "errors": 0,
+        "nonfinite_values": 0,
+        "operation_semantic": 0.0,
+        "operation_handoff": 0.0,
+        "target": 1.0,
+        "joint_semantic": 0.0,
+        "joint_handoff": 0.0
+      },
+      "decider": {
+        "max_options_per_question": 100000,
+        "coarse_to_fine_cases": 0,
+        "wire_input_cases": 95,
+        "backend_call_count": 95
+      },
+      "latency": {
+        "warmup_excluded": 3,
+        "n": 92,
+        "p50_ms": 39.51,
+        "p95_ms": 67.739,
+        "synchronized": true
+      },
+      "scoring_source": "decision.answers.raw (merged validated answers)",
+      "prediction_source": "last_backend_call_raw_envelope",
+      "environment_versions": {
+        "python": "3.12.14 (main, Sep  1 2026, 14:16:52) [Clang 22.1.3 ]",
+        "platform": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.43",
+        "system": "Linux",
+        "machine": "x86_64",
+        "laya_distribution": "0.3.4",
+        "torch_distribution": "2.14.0",
+        "torch_runtime": "2.14.0+cu130",
+        "laya_runtime": "0.3.4"
+      },
+      "report_sha256": "8a91c15fe0b70977618847ddbf077c5b07d2717c4c867fce2a7cb027c62f4e2b",
+      "operation_ece": {
+        "ece": 0.234227,
+        "n": 95,
+        "bins": [
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "n": 1,
+            "accuracy": 0.0,
+            "mean_selected_probability": 0.5622,
+            "gap": 0.5622
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "n": 1,
+            "accuracy": 0.0,
+            "mean_selected_probability": 0.6039,
+            "gap": 0.6039
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "n": 2,
+            "accuracy": 0.5,
+            "mean_selected_probability": 0.7516,
+            "gap": 0.2516
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "n": 91,
+            "accuracy": 0.769231,
+            "mean_selected_probability": 0.99541,
+            "gap": 0.226179
+          }
+        ],
+        "definition": "accuracy versus selected operation probability",
+        "accuracy_key": "operation_semantic_ok"
+      },
+      "joint_ece": null,
+      "correct_counts": {
+        "operation_semantic_ok": 71,
+        "operation_handoff_ok": 69,
+        "target_ok": 79,
+        "semantic_ok": 63,
+        "handoff_ok": 59
+      },
+      "smoke_ok": true,
+      "state_slices": {
+        "calendar": {
+          "n": 11,
+          "errors": 0,
+          "nonfinite_values": 0,
+          "operation_semantic": 0.636364,
+          "operation_handoff": 0.727273,
+          "target": 0.727273,
+          "joint_semantic": 0.636364,
+          "joint_handoff": 0.636364
+        },
+        "compose": {
+          "n": 16,
+          "errors": 0,
+          "nonfinite_values": 0,
+          "operation_semantic": 0.75,
+          "operation_handoff": 0.625,
+          "target": 0.875,
+          "joint_semantic": 0.6875,
+          "joint_handoff": 0.5625
+        },
+        "files": {
+          "n": 8,
+          "errors": 0,
+          "nonfinite_values": 0,
+          "operation_semantic": 0.75,
+          "operation_handoff": 0.75,
+          "target": 1.0,
+          "joint_semantic": 0.75,
+          "joint_handoff": 0.75
+        },
+        "inbox": {
+          "n": 36,
+          "errors": 0,
+          "nonfinite_values": 0,
+          "operation_semantic": 0.805556,
+          "operation_handoff": 0.833333,
+          "target": 0.805556,
+          "joint_semantic": 0.638889,
+          "joint_handoff": 0.638889
+        },
+        "people": {
+          "n": 5,
+          "errors": 0,
+          "nonfinite_values": 0,
+          "operation_semantic": 0.4,
+          "operation_handoff": 0.2,
+          "target": 0.4,
+          "joint_semantic": 0.4,
+          "joint_handoff": 0.2
+        },
+        "search": {
+          "n": 5,
+          "errors": 0,
+          "nonfinite_values": 0,
+          "operation_semantic": 0.8,
+          "operation_handoff": 0.8,
+          "target": 1.0,
+          "joint_semantic": 0.8,
+          "joint_handoff": 0.8
+        },
+        "settings": {
+          "n": 6,
+          "errors": 0,
+          "nonfinite_values": 0,
+          "operation_semantic": 0.833333,
+          "operation_handoff": 0.833333,
+          "target": 1.0,
+          "joint_semantic": 0.833333,
+          "joint_handoff": 0.833333
+        },
+        "ticket": {
+          "n": 8,
+          "errors": 0,
+          "nonfinite_values": 0,
+          "operation_semantic": 0.75,
+          "operation_handoff": 0.625,
+          "target": 0.875,
+          "joint_semantic": 0.625,
+          "joint_handoff": 0.5
+        }
+      }
+    }
+  },
+  "paired": {
+    "v32b": {
+      "deployed_only_correct": 1,
+      "direct_only_correct": 2,
+      "semantic_disagreements": [
+        "inbox/inbox_filter",
+        "inbox/inbox_sent_folder",
+        "inbox/inbox_pop_out"
+      ],
+      "nonwide_scoring_identical": true,
+      "direct_backend_questions_equal_original_wire": true
+    },
+    "official-multilingual": {
+      "deployed_only_correct": 0,
+      "direct_only_correct": 0,
+      "semantic_disagreements": [],
+      "nonwide_scoring_identical": true,
+      "direct_backend_questions_equal_original_wire": true
+    }
+  }
+}
